@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun MainApp() {
     val navController = rememberNavController()
@@ -347,9 +347,10 @@ fun MainApp() {
     Scaffold(
         containerColor = SmartLedgerColors.bg,
         bottomBar = {
-            if (currentRoute != "permission" && currentRoute != "search" &&
-                currentRoute != "ai" && currentRoute != "screenshot" &&
-                currentRoute != "chat"
+            // 键盘弹出时收起底部导航：否则它会被顶到键盘上方，输入框也跟着往上挤
+            val imeVisible = WindowInsets.isImeVisible
+            if (!imeVisible && currentRoute != "permission" && currentRoute != "search" &&
+                currentRoute != "ai" && currentRoute != "screenshot"
             ) {
                 NavigationBar(
                     containerColor = SmartLedgerColors.surface,
@@ -456,7 +457,6 @@ fun MainApp() {
             }
             composable("chat") {
                 com.smartledger.ui.chat.ChatScreen(
-                    onBack = { navController.popBackStack() },
                     onOpenAiSettings = { navController.navigate("ai") }
                 )
             }
@@ -495,7 +495,14 @@ fun MainApp() {
                     onBack = { navController.popBackStack() },
                     onNavigateToFeedback = { navController.navigate("feedback") },
                     onNavigateToPrivacy = { navController.navigate("privacy") },
-                    onNavigateToChat = { navController.navigate("chat") }
+                    // 碎碎已是底部 tab：从设置进去按 tab 的方式切换，避免在设置页上叠一层
+                    onNavigateToChat = {
+                        navController.navigate(Screen.Chat.route) {
+                            popUpTo(Screen.Home.route) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
+                    }
                 )
             }
             composable("feedback") {

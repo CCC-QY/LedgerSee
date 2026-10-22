@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -60,8 +59,9 @@ import com.smartledger.ui.theme.SmartLedgerColors
  */
 @Composable
 fun ChatScreen(
-    onBack: () -> Unit,
     onOpenAiSettings: () -> Unit,
+    /** 作为底部 tab 使用时不需要返回箭头；传 null 即隐藏 */
+    onBack: (() -> Unit)? = null,
     viewModel: ChatViewModel = viewModel()
 ) {
     val state by viewModel.state.collectAsState()
@@ -79,17 +79,18 @@ fun ChatScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(SmartLedgerColors.bg)
-            .navigationBarsPadding()
     ) {
         // ═══ 顶栏 ═══
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(start = if (onBack == null) 20.dp else 8.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = SmartLedgerColors.fg)
+            if (onBack != null) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.Outlined.ArrowBack, contentDescription = "返回", tint = SmartLedgerColors.fg)
+                }
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
@@ -313,17 +314,16 @@ private fun EmptyChat(
             .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        Text("碎碎", fontSize = 20.sp, fontWeight = FontWeight.SemiBold, color = SmartLedgerColors.fg)
-        Spacer(modifier = Modifier.height(8.dp))
+        // 顶栏已经有名字了，这里不再重复一次「碎碎」
         Text(
             when {
                 checking -> "正在看看你的账本…"
                 ready -> "我在。账本翻过了，想聊哪笔？"
                 else -> "我在这儿，但要先配个 DeepSeek Key 才能开口。"
             },
-            fontSize = 14.sp,
-            lineHeight = 22.sp,
-            color = SmartLedgerColors.fgSecondary
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            color = SmartLedgerColors.fg
         )
         if (ready) {
             Spacer(modifier = Modifier.height(20.dp))
