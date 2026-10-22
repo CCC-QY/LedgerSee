@@ -18,11 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.smartledger.data.db.entity.Category
 import com.smartledger.ui.components.PaymentChannelPicker
 import com.smartledger.ui.theme.SmartLedgerColors
@@ -42,6 +44,11 @@ fun RecordScreen(
 
     val categories by viewModel.getCategories(transactionType)
         .collectAsState(initial = emptyList())
+
+    // 手动记账后要主动叫一次碎碎念：Compose 内部导航不会触发 Activity 的 onResume。
+    // 用进程级作用域，避免页面弹栈时把还在等模型的请求一起取消。
+    val appContext = LocalContext.current.applicationContext
+    val appScope = (appContext as? com.smartledger.SmartLedgerApp)?.appScope
 
     LaunchedEffect(transactionType) {
         selectedCategory = null
@@ -315,6 +322,11 @@ fun RecordScreen(
                                     merchant = ""
                                     note = ""
                                     // 保留上次渠道，连续记账更省事
+                                    appScope?.launch {
+                                        runCatching {
+                                            com.smartledger.ai.QuipEngine.maybeSpeak(appContext)
+                                        }
+                                    }
                                     onSaved()
                                 }
                             )

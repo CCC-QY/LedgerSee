@@ -14,6 +14,14 @@ import com.smartledger.util.NotificationStyle
 
 class SmartLedgerApp : Application() {
 
+    /**
+     * 进程级协程作用域：给「记账后顺带说一句」这类不该随页面销毁而中断的任务用。
+     * 用 rememberCoroutineScope 会随导航立即取消，等不到模型返回。
+     */
+    val appScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
+
     val database by lazy { AppDatabase.getInstance(this) }
     val transactionRepository by lazy { TransactionRepository(database.transactionDao()) }
     val categoryRepository by lazy { CategoryRepository(database.categoryDao()) }

@@ -194,6 +194,7 @@ LedgerSee 在 SmartLedger 的基础上继续演进，主要新增：
 
 详见 [Releases](https://github.com/CCC-QY/LedgerSee/releases)。
 
+- **v1.3.1**：修复手动记账后不触发碎碎念（Compose 内部导航不走 onResume）
 - **v1.3.0**：新增「碎碎念」——一天最多一条，由本地打分挑一笔账单，用 DeepSeek 说出那句话
 - **v1.2.0**：新增截图记账（本地中文 OCR，识别后可修改再保存）
 - **v1.1.1**：修复 DeepSeek thinking 模式耗尽 token 导致 AI 返回空内容；关闭 thinking 并补充空响应诊断
