@@ -202,6 +202,7 @@ LedgerSee 在 SmartLedger 的基础上继续演进，主要新增：
 
 详见 [Releases](https://github.com/CCC-QY/LedgerSee/releases)。
 
+- **v1.3.5**：修复 1.3.4 引入的「键盘不弹出」——撤掉 windowSoftInputMode=adjustResize
 - **v1.3.4**：把「和碎碎聊聊」放进底部导航，键盘弹出时自动收起导航栏
 - **v1.3.3**：新增「和碎碎聊聊」——同一个角色可以对话，问账本、追问某笔；消息存本机，可清空
 - **v1.3.2**：编辑账单时可直接改支出/收入，切换后自动换成对应方向的分类

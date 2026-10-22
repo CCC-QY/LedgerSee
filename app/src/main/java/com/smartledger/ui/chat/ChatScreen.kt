@@ -79,6 +79,9 @@ fun ChatScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(SmartLedgerColors.bg)
+            // 键盘高度挂在整个页面上：窗口不会随键盘缩放（未用 adjustResize），
+            // 只在输入框上补 padding 会把整页顶出屏幕，顶栏也跟着消失
+            .imePadding()
     ) {
         // ═══ 顶栏 ═══
         Row(
@@ -170,7 +173,6 @@ fun ChatScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .imePadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.Bottom
             ) {
