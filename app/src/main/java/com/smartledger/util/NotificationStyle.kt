@@ -119,12 +119,16 @@ object NotificationStyle {
     fun openAppPendingIntent(
         context: Context,
         requestCode: Int = 0,
-        transactionId: Long? = null
+        transactionId: Long? = null,
+        openChat: Boolean = false
     ): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             if (transactionId != null && transactionId > 0) {
                 putExtra("openTransactionId", transactionId)
+            }
+            if (openChat) {
+                putExtra("openChat", true)
             }
         }
         return PendingIntent.getActivity(
@@ -328,6 +332,9 @@ object NotificationStyle {
     fun notifyQuip(context: Context, message: String, transactionId: Long) {
         ensureChannels(context)
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        // 点通知直接进聊天：这条消息本来就是想让人回一句的
+        val openChat = openAppPendingIntent(context, ID_QUIP, transactionId, openChat = true)
+        val openBill = openAppPendingIntent(context, ID_QUIP + 1, transactionId)
         val notification = NotificationCompat.Builder(context, CHANNEL_QUIP)
             .setSmallIcon(R.drawable.ic_stat_notification)
             .setColor(accentColor(context))
@@ -335,7 +342,9 @@ object NotificationStyle {
             .setContentText(message)
             .setSubText("智能记账")
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
-            .setContentIntent(openAppPendingIntent(context, ID_QUIP, transactionId))
+            .setContentIntent(openChat)
+            .addAction(0, "回一句", openChat)
+            .addAction(0, "看这笔", openBill)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)

@@ -17,13 +17,37 @@ sealed class AiCallResult {
     data class Error(val message: String) : AiCallResult()
 }
 
+/** 一轮对话。role 只能是 "user" 或 "assistant"。 */
+data class ChatTurn(val role: String, val content: String)
+
 /**
  * DeepSeek OpenAI-compatible Chat Completions 客户端。
  * 不打印请求体、API Key 或账单内容。
  */
 object DeepSeekClient {
 
+    /** 单轮：system + 一条 user。复盘与碎碎念都用这个。 */
     suspend fun generate(apiKey: String, prompt: AiPrompt): AiCallResult =
+        chat(
+            apiKey = apiKey,
+            system = prompt.system,
+            turns = listOf(ChatTurn("user", prompt.user)),
+            temperature = prompt.temperature,
+            maxTokens = prompt.maxTokens
+        )
+
+    /**
+     * 多轮：system + 若干轮历史。
+     *
+     * 历史必须按时间正序传入；调用方负责裁剪长度（见 ChatViewModel.MAX_TURNS）。
+     */
+    suspend fun chat(
+        apiKey: String,
+        system: String,
+        turns: List<ChatTurn>,
+        temperature: Double,
+        maxTokens: Int
+    ): AiCallResult =
         withContext(Dispatchers.IO) {
             if (apiKey.isBlank()) {
                 return@withContext AiCallResult.Error("还没有配置 DeepSeek API Key。")
@@ -37,21 +61,23 @@ object DeepSeekClient {
                         put(
                             JSONObject().apply {
                                 put("role", "system")
-                                put("content", prompt.system)
+                                put("content", system)
                             }
                         )
-                        put(
-                            JSONObject().apply {
-                                put("role", "user")
-                                put("content", prompt.user)
-                            }
-                        )
+                        turns.forEach { turn ->
+                            put(
+                                JSONObject().apply {
+                                    put("role", turn.role)
+                                    put("content", turn.content)
+                                }
+                            )
+                        }
                     }
                 )
-                put("temperature", prompt.temperature)
-                put("max_tokens", prompt.maxTokens)
+                put("temperature", temperature)
+                put("max_tokens", maxTokens)
                 put("stream", false)
-                // deepseek-flash 默认开启 thinking；月报只需要最终答案，
+                // deepseek-flash 默认开启 thinking；这里只需要最终答案，
                 // 关闭后可避免推理过程耗尽 max_tokens，导致 content 为空。
                 put("thinking", JSONObject().apply { put("type", "disabled") })
             }.toString().toByteArray(Charsets.UTF_8)

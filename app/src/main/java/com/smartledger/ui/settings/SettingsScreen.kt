@@ -30,7 +30,8 @@ import com.smartledger.ui.theme.ThemeMode
 fun SettingsScreen(
     onBack: () -> Unit = {},
     onNavigateToFeedback: () -> Unit = {},
-    onNavigateToPrivacy: () -> Unit = {}
+    onNavigateToPrivacy: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("smart_ledger", Context.MODE_PRIVATE)
@@ -325,6 +326,13 @@ fun SettingsScreen(
                                 quipEnabled = enabled
                                 com.smartledger.ai.QuipSettings.setEnabled(context, enabled)
                             }
+                        )
+                        DividerLine()
+                        MenuSettingItem(
+                            icon = Icons.Outlined.Forum,
+                            label = "和碎碎聊聊",
+                            subtitle = "翻着账本陪你说话，可追问某一笔",
+                            onClick = onNavigateToChat
                         )
                         // 调试包才显示：不用等一天，立刻看当前账单里会不会说、说什么
                         if (isDebuggable(context)) {

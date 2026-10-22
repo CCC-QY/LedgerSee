@@ -48,10 +48,15 @@ class MainActivity : ComponentActivity() {
     var deepLinkTransactionId by mutableStateOf(-1L)
         private set
 
+    /** 碎碎念通知点进聊天；与 deepLinkTransactionId 互斥，优先聊天 */
+    var deepLinkChat by mutableStateOf(false)
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         deepLinkTransactionId = intent?.getLongExtra("openTransactionId", -1) ?: -1
+        deepLinkChat = intent?.getBooleanExtra("openChat", false) == true
 
         // 初始化主题模式
         val prefs = getSharedPreferences("smart_ledger", MODE_PRIVATE)
@@ -89,11 +94,14 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         deepLinkTransactionId = intent.getLongExtra("openTransactionId", -1)
+        deepLinkChat = intent.getBooleanExtra("openChat", false)
     }
 
     fun clearDeepLink() {
         deepLinkTransactionId = -1L
+        deepLinkChat = false
         intent?.removeExtra("openTransactionId")
+        intent?.removeExtra("openChat")
     }
 }
 
@@ -315,8 +323,16 @@ fun MainApp() {
     // 通知深链：冷启动 + 热启动（onNewIntent）均可
     val activity = context as? MainActivity
     val openTransactionId = activity?.deepLinkTransactionId ?: -1L
+    val openChatFromNotification = activity?.deepLinkChat ?: false
+    LaunchedEffect(openChatFromNotification) {
+        if (openChatFromNotification) {
+            activity?.clearDeepLink()
+            navController.navigate("chat")
+        }
+    }
     LaunchedEffect(openTransactionId) {
-        if (openTransactionId > 0) {
+        // 同一份通知里两个都带时，聊天优先
+        if (openTransactionId > 0 && !openChatFromNotification) {
             activity?.clearDeepLink()
             navController.navigate(Screen.Home.route) {
                 popUpTo(Screen.Home.route) { inclusive = true }
@@ -332,7 +348,8 @@ fun MainApp() {
         containerColor = SmartLedgerColors.bg,
         bottomBar = {
             if (currentRoute != "permission" && currentRoute != "search" &&
-                currentRoute != "ai" && currentRoute != "screenshot"
+                currentRoute != "ai" && currentRoute != "screenshot" &&
+                currentRoute != "chat"
             ) {
                 NavigationBar(
                     containerColor = SmartLedgerColors.surface,
@@ -437,6 +454,12 @@ fun MainApp() {
             composable("ai") {
                 AiScreen(onBack = { navController.popBackStack() })
             }
+            composable("chat") {
+                com.smartledger.ui.chat.ChatScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenAiSettings = { navController.navigate("ai") }
+                )
+            }
             composable("screenshot") {
                 com.smartledger.ui.screenshot.ScreenshotImportScreen(
                     onBack = { navController.popBackStack() },
@@ -471,7 +494,8 @@ fun MainApp() {
                 com.smartledger.ui.settings.SettingsScreen(
                     onBack = { navController.popBackStack() },
                     onNavigateToFeedback = { navController.navigate("feedback") },
-                    onNavigateToPrivacy = { navController.navigate("privacy") }
+                    onNavigateToPrivacy = { navController.navigate("privacy") },
+                    onNavigateToChat = { navController.navigate("chat") }
                 )
             }
             composable("feedback") {

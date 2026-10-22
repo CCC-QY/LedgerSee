@@ -9,11 +9,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.smartledger.data.db.dao.AiReportDao
 import com.smartledger.data.db.dao.BudgetDao
 import com.smartledger.data.db.dao.CategoryDao
+import com.smartledger.data.db.dao.QuipMessageDao
 import com.smartledger.data.db.dao.TransactionDao
 import com.smartledger.data.db.entity.AiReport
 import com.smartledger.data.db.entity.Budget
 import com.smartledger.data.db.entity.Category
 import com.smartledger.data.db.entity.CategoryBudget
+import com.smartledger.data.db.entity.QuipMessage
 import com.smartledger.data.db.entity.Transaction
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,9 +27,10 @@ import kotlinx.coroutines.launch
         Category::class,
         Budget::class,
         CategoryBudget::class,
-        AiReport::class
+        AiReport::class,
+        QuipMessage::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +39,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun budgetDao(): BudgetDao
     abstract fun aiReportDao(): AiReportDao
+    abstract fun quipMessageDao(): QuipMessageDao
 
     companion object {
         @Volatile
@@ -61,6 +65,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 → v3：新增碎碎念对话记录表 */
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `quip_messages` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`role` TEXT NOT NULL, " +
+                        "`content` TEXT NOT NULL, " +
+                        "`transactionId` INTEGER, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_quip_messages_createdAt` " +
+                        "ON `quip_messages` (`createdAt`)"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -68,7 +90,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smart_ledger.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
