@@ -1,15 +1,18 @@
-# SmartLedger 智能记账
+# LedgerSee 智能记账
 
-[![Latest Release](https://img.shields.io/github/v/release/huanghhcri/SmartLedger?label=release)](https://github.com/huanghhcri/SmartLedger/releases/latest)
+[![Latest Release](https://img.shields.io/github/v/release/CCC-QY/LedgerSee?label=release)](https://github.com/CCC-QY/LedgerSee/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-green.svg)](https://github.com/huanghhcri/SmartLedger)
+[![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-green.svg)](https://github.com/CCC-QY/LedgerSee)
 
-一款 Android 本地智能记账应用：监听支付类通知自动入账，也支持手动记账、预算、统计与数据备份。  
+一款 Android 本地智能记账应用：监听支付类通知自动入账，也支持手动记账、截图记账、预算、统计与数据备份。  
 当前版本：**v1.2.0**
+
+> 本项目基于 [SmartLedger](https://github.com/huanghhcri/SmartLedger) 二次开发，遵循 MIT 协议。上游署名见 [NOTICE](NOTICE)。
 
 ## ✨ 功能特点
 
 ### 🤖 自动记账
+
 - **多渠道监听**：微信、支付宝、云闪付、抖音、京东 / 淘宝收银台，以及工农中建招等主流银行 App
 - **双向识别**：支出（消费、转账）与收入（退款、红包、转入）
 - **聚合通知补全**：系统折叠成「[N条]」摘要时，从同组子通知补全金额（付款码、银行动账等）
@@ -20,6 +23,7 @@
 - **监听保活**：权限失效、服务假断开时在 App 内提示并引导恢复
 
 ### 🧠 AI 财务复盘（可选）
+
 - 基于本月 / 历史账单生成月度复盘
 - 支持「专业型」与「聊天型」两种语气
 - 先在本机汇总统计，再由 DeepSeek 生成解释与建议
@@ -27,32 +31,38 @@
 - 只发送聚合统计；不发送通知原文、短信、卡号或备注
 
 ### 📷 截图记账
+
 - 从相册选择微信 / 支付宝 / 银行账单截图
 - 本地中文 OCR 识别，截图不上传
 - 自动提取金额、商户、收/支、渠道与时间
 - 识别后可修改分类、金额、商户，再保存
 
 ### ✍️ 手动记账
+
 - 支出 / 收入切换、数字键盘、分类网格
 - **渠道可选**：微信、支付宝、云闪付、现金、银行卡、抖音、京东，或自定义
 - 编辑账单时可改金额、商户、备注、**渠道**与分类
 
 ### 📊 首页与统计
+
 - **总余额**：期初 + 全部收入 − 全部支出，可点按设置期初
 - 今日支出、本月收支；支持切换历史月份
 - 日 / 周 / 月 / 年统计、分类占比、排行与趋势
 - 搜索：按关键词、收支类型、渠道、分类筛选
 
 ### 💰 预算管理
+
 - 月度总预算、分类预算
 - 使用进度展示
 
 ### 🎨 外观与个人
+
 - 浅色 / 深色 / 跟随系统
 - 自定义昵称、陪伴天数
 - 设置内反馈建议入口
 
 ### 🔄 更新与数据
+
 - **应用内检查更新**：启动自动检测 + 设置页手动检测
 - **断点续传**：更新包下载失败可从上次进度继续
 - CSV 导出；本地备份 / 恢复（含重装后发现历史备份）
@@ -60,19 +70,19 @@
 
 ## 📸 界面预览
 
-应用采用偏 Linear 的克制风格；支持浅色与深色主题。
+截图尚未提交到仓库。本地运行后可放入 `screenshots/` 目录，并在本节按下面的表格补充：
 
 | 首页 | 记账 | 统计 | 我的 |
 |------|------|------|------|
-| ![](screenshots/home.png) | ![](screenshots/record.png) | ![](screenshots/statistics.png) | ![](screenshots/profile.png) |
+| `screenshots/home.png` | `screenshots/record.png` | `screenshots/statistics.png` | `screenshots/profile.png` |
 
-> 若仓库中暂无截图，可本地运行后自行补充到 `screenshots/` 目录。
+应用采用偏 Linear 的克制风格，支持浅色与深色主题。
 
 ## 🚀 安装方式
 
 ### 方式一：下载 APK（推荐）
 
-1. 打开 [Releases](https://github.com/huanghhcri/SmartLedger/releases/latest)
+1. 打开 [Releases](https://github.com/CCC-QY/LedgerSee/releases/latest)
 2. 下载最新 `*.apk`（需挂在对应 Release 附件中）
 3. 手机安装时允许「安装未知应用」
 
@@ -81,8 +91,8 @@
 ### 方式二：自行编译
 
 ```bash
-git clone https://github.com/huanghhcri/SmartLedger.git
-cd SmartLedger
+git clone https://github.com/CCC-QY/LedgerSee.git
+cd LedgerSee
 ```
 
 用 Android Studio 打开工程，连接真机或模拟器后 Run。  
@@ -109,10 +119,10 @@ Release 签名从 `local.properties` 读取（勿提交密钥到仓库）。
 
 ### 首次使用
 
-1. 安装并打开应用  
-2. 按引导开启「通知使用权」（智能记账）  
-3. 按需开启悬浮窗（模糊账单确认）  
-4. 可在首页点「总余额」设置期初金额  
+1. 安装并打开应用
+2. 按引导开启「通知使用权」（智能记账）
+3. 按需开启悬浮窗（模糊账单确认）
+4. 可在首页点「总余额」设置期初金额
 
 ### 自动记账示例
 
@@ -152,6 +162,17 @@ Release 签名从 `local.properties` 读取（勿提交密钥到仓库）。
 | AI（可选） | DeepSeek Chat Completions（OpenAI 兼容） |
 | OCR | ML Kit 中文文字识别（本地） |
 
+## 🆚 与上游 SmartLedger 的差异
+
+LedgerSee 在 SmartLedger 的基础上继续演进，主要新增：
+
+- **AI 财务复盘**：本地聚合统计后由 DeepSeek 生成月度分析（本仓库新增模块）
+- **截图记账**：ML Kit 本地中文 OCR，识别账单截图后人工确认再入库（本仓库新增模块）
+- **通知解析增强**：聚合摘要金额补全、银行截断金额确认、营销与退款状态过滤
+- **AI 月报缓存**：新增 `ai_reports` 表，Room 数据库迁移至 v2
+
+原始解析规则、分类体系与界面结构沿用上游实现。
+
 ## ⚠️ 已知问题与建议
 
 1. **国产机杀后台**  
@@ -171,38 +192,41 @@ Release 签名从 `local.properties` 读取（勿提交密钥到仓库）。
 
 ## 📝 近期更新（摘要）
 
-详见 [Releases](https://github.com/huanghhcri/SmartLedger/releases)。
+详见 [Releases](https://github.com/CCC-QY/LedgerSee/releases)。
 
 - **v1.2.0**：新增截图记账（本地中文 OCR，识别后可修改再保存）
 - **v1.1.1**：修复 DeepSeek thinking 模式耗尽 token 导致 AI 返回空内容；关闭 thinking 并补充空响应诊断
 - **v1.1.0**：新增 AI 财务复盘（DeepSeek，可选），支持专业型 / 聊天型月度分析
-- **v1.0.24**：启动自动检查更新；下载断点续传；手动记账 / 编辑可选渠道  
-- **v1.0.21**：修复聚合通知漏记（微信付款码及全渠道）  
-- **v1.0.20**：首页总余额与期初设置  
-- **v1.0.18～19**：模糊账单确认、银行截断金额、监听假断开修复  
+- **v1.0.24**：启动自动检查更新；下载断点续传；手动记账 / 编辑可选渠道
+- **v1.0.21**：修复聚合通知漏记（微信付款码及全渠道）
+- **v1.0.20**：首页总余额与期初设置
+- **v1.0.18～19**：模糊账单确认、银行截断金额、监听假断开修复
 
 ## 🤝 贡献
 
 欢迎 Issue 与 Pull Request。
 
 **报告问题时请尽量提供：**
-- 机型、系统版本、App 版本号  
+
+- 机型、系统版本、App 版本号
 - 复现步骤；若是漏记，请附支付 App 通知的**完整标题与正文**（可打码金额以外的隐私）
 
 **希望支持新银行 / 新收银台时，请提供：**
-1. 通知截图  
-2. 标题 + 正文原文  
+
+1. 通知截图
+2. 标题 + 正文原文
 
 ## 📄 许可证
 
-本项目采用 [MIT](LICENSE) 许可证。
+本项目采用 [MIT](LICENSE) 许可证。基于 [SmartLedger](https://github.com/huanghhcri/SmartLedger) 二次开发，上游版权与许可声明见 [NOTICE](NOTICE)。
 
 ## 🙏 致谢
 
+- [SmartLedger](https://github.com/huanghhcri/SmartLedger) —— 本项目的上游基础
 - [Jetpack Compose](https://developer.android.com/jetpack/compose)
 - [Material 3](https://m3.material.io/)
 - [Room](https://developer.android.com/training/data-storage/room)
 
 ---
 
-有问题或建议欢迎 [提交 Issue](https://github.com/huanghhcri/SmartLedger/issues)。
+有问题或建议欢迎 [提交 Issue](https://github.com/CCC-QY/LedgerSee/issues)。
