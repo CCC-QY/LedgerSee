@@ -22,6 +22,10 @@ class TransactionRepository(private val dao: TransactionDao) {
     fun getByTimeRange(startTime: Long, endTime: Long): Flow<List<Transaction>> =
         dao.getByTimeRange(startTime, endTime)
 
+    /** 一次性取区间数据，供后台任务（如碎碎念选材）使用 */
+    suspend fun getByTimeRangeOnce(startTime: Long, endTime: Long): List<Transaction> =
+        dao.getByTimeRangeOnce(startTime, endTime)
+
     fun getExpenseSum(startTime: Long, endTime: Long): Flow<Double> =
         dao.getExpenseSum(startTime, endTime)
 

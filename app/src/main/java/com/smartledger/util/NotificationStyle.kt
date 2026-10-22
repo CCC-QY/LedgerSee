@@ -23,12 +23,14 @@ object NotificationStyle {
     const val CHANNEL_KEEP_ALIVE = "keep_alive"
     const val CHANNEL_FLOATING = "floating_window_channel"
     const val CHANNEL_LISTENER_ALERT = "listener_alert"
+    const val CHANNEL_QUIP = "quip_whisper"
 
     private const val ID_PAYMENT_BASE = 2001
     private const val ID_CONFIRM_BASE = 3001
     const val ID_KEEP_ALIVE = 1002
     const val ID_FLOATING = 1001
     const val ID_LISTENER_DOWN = 1003
+    const val ID_QUIP = 4001
     const val CHANNEL_CONFIRM = "payment_confirm"
 
     fun ensureChannels(context: Context) {
@@ -93,6 +95,20 @@ object NotificationStyle {
                 description = "支付监听长时间未连上时提醒"
                 enableVibration(true)
                 setShowBadge(true)
+            }
+        )
+
+        // 碎碎念：一天最多一条，用默认优先级让它能出现在通知栏，但不设为高打扰
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_QUIP,
+                "碎碎念",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "偶尔就某笔账单念叨一句"
+                enableVibration(false)
+                setShowBadge(true)
+                lightColor = ContextCompat.getColor(context, R.color.accent)
             }
         )
     }
@@ -303,5 +319,28 @@ object NotificationStyle {
     fun cancelListenerDown(context: Context) {
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.cancel(ID_LISTENER_DOWN)
+    }
+
+    /**
+     * 碎碎念：就某笔账单说一句话，点开直达那一笔。
+     * 措辞由模型或本地模板负责，这里只做展示。
+     */
+    fun notifyQuip(context: Context, message: String, transactionId: Long) {
+        ensureChannels(context)
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        val notification = NotificationCompat.Builder(context, CHANNEL_QUIP)
+            .setSmallIcon(R.drawable.ic_stat_notification)
+            .setColor(accentColor(context))
+            .setContentTitle("碎碎")
+            .setContentText(message)
+            .setSubText("智能记账")
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setContentIntent(openAppPendingIntent(context, ID_QUIP, transactionId))
+            .setAutoCancel(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .build()
+        manager.notify(ID_QUIP, notification)
     }
 }

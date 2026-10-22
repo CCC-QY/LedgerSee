@@ -415,6 +415,9 @@ class PaymentNotificationListener : NotificationListenerService() {
             parsed.type,
             id
         )
+
+        // 碎碎念：账已落库，顺手看看今天要不要说一句。失败一律静默，不影响记账
+        runCatching { com.smartledger.ai.QuipEngine.maybeSpeak(applicationContext) }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {}

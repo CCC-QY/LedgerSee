@@ -49,6 +49,9 @@ fun SettingsScreen(
     var confirmAllAuto by remember {
         mutableStateOf(prefs.getBoolean("confirm_all_auto", false))
     }
+    var quipEnabled by remember {
+        mutableStateOf(com.smartledger.ai.QuipSettings.isEnabled(context))
+    }
 
     // 检查更新状态（版本号读安装包，勿写死）
     val appVersionLabel = remember {
@@ -296,6 +299,57 @@ fun SettingsScreen(
                 }
             }
 
+            item { Spacer(modifier = Modifier.height(20.dp)) }
+
+            // ═══ 碎碎念 ═══
+            item {
+                SectionTitle("碎碎念")
+            }
+            item {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = SmartLedgerColors.surface)
+                ) {
+                    Column {
+                        SwitchItem(
+                            icon = Icons.Outlined.Chat,
+                            label = "偶尔说一句",
+                            description = "挑一笔有点意思的账单念叨一句，一天最多一条。" +
+                                "开启后，该笔的金额、分类、商户会发送给 DeepSeek；" +
+                                "未配置 API Key 时使用内置台词，不出本机",
+                            checked = quipEnabled,
+                            onCheckedChange = { enabled ->
+                                quipEnabled = enabled
+                                com.smartledger.ai.QuipSettings.setEnabled(context, enabled)
+                            }
+                        )
+                        // 调试包才显示：不用等一天，立刻看当前账单里会不会说、说什么
+                        if (isDebuggable(context)) {
+                            DividerLine()
+                            MenuSettingItem(
+                                icon = Icons.Outlined.PlayArrow,
+                                label = "试一句（调试）",
+                                subtitle = com.smartledger.ai.QuipSettings.lastMessage(context),
+                                onClick = {
+                                    coroutineScope.launch {
+                                        val text = com.smartledger.ai.QuipEngine
+                                            .maybeSpeak(context, force = true)
+                                        Toast.makeText(
+                                            context,
+                                            text ?: "当前账单里没有值得说的",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
             // 自动记账故障提示
             item {
                 Card(
@@ -525,6 +579,11 @@ fun SettingsScreen(
         )
     }
 }
+
+/** 调试包才显示「试一句」入口，正式版不暴露 */
+private fun isDebuggable(context: Context): Boolean =
+    (context.applicationInfo.flags and
+        android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
 @Composable
 private fun SectionTitle(title: String) {

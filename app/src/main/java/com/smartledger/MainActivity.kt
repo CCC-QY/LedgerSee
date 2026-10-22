@@ -188,6 +188,11 @@ fun MainApp() {
                         pendingReconnectCheck = false
                     }
                 }
+
+                // 打开 App 是最可靠的时机之一：内部有 20 小时间隔和阈值，多数时候什么都不做
+                scope.launch {
+                    runCatching { com.smartledger.ai.QuipEngine.maybeSpeak(context) }
+                }
             }
         })
     }

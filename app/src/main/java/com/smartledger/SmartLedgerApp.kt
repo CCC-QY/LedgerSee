@@ -39,6 +39,7 @@ class SmartLedgerApp : Application() {
         NotificationStyle.ensureChannels(this)
         ListenerRebindScheduler.schedule(this)
         ListenerWatchdog.schedule(this)
+        com.smartledger.util.QuipScheduler.schedule(this)
         if (ListenerStatus.isEnabledInSettings(this)) {
             com.smartledger.service.KeepAliveService.start(this)
             ListenerStatus.ensureListening(this)
