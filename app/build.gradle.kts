@@ -35,6 +35,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // 与手机上已安装的正式版共存：包名加后缀，否则签名不同会导致覆盖安装失败
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

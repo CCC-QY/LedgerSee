@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 仅 debug 构建生效：桌面上与正式版区分开，避免装错 -->
+<resources>
+    <string name="app_name">智能记账 Debug</string>
+</resources>
