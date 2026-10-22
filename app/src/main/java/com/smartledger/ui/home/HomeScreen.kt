@@ -6,6 +6,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -885,9 +887,18 @@ private fun EditTransactionDialog(
                 ?: PaymentMethods.PRESETS.first()
         )
     }
+    var selectedType by remember { mutableStateOf(transaction.type) }
     var selectedCategoryId by remember { mutableStateOf(transaction.categoryId) }
-    val typeCategories = remember(categories, transaction.type) {
-        categories.filter { it.type == transaction.type }
+    val typeCategories = remember(categories, selectedType) {
+        categories.filter { it.type == selectedType }
+    }
+
+    // 改了收支方向后，原来的分类属于另一个方向，必须换成新方向下的分类，
+    // 否则会写出「收入 + 餐饮」这种不一致的数据。
+    fun switchType(newType: String) {
+        if (newType == selectedType) return
+        selectedType = newType
+        selectedCategoryId = categories.firstOrNull { it.type == newType }?.id
     }
 
     AlertDialog(
@@ -897,7 +908,35 @@ private fun EditTransactionDialog(
         titleContentColor = SmartLedgerColors.fg,
         title = { Text("编辑账单", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // 收支方向
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = selectedType == "expense",
+                        onClick = { switchType("expense") },
+                        label = { Text("支出") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SmartLedgerColors.expenseDim,
+                            selectedLabelColor = SmartLedgerColors.expense,
+                            containerColor = SmartLedgerColors.surfaceHover,
+                            labelColor = SmartLedgerColors.fgSecondary
+                        )
+                    )
+                    FilterChip(
+                        selected = selectedType == "income",
+                        onClick = { switchType("income") },
+                        label = { Text("收入") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = SmartLedgerColors.incomeDim,
+                            selectedLabelColor = SmartLedgerColors.income,
+                            containerColor = SmartLedgerColors.surfaceHover,
+                            labelColor = SmartLedgerColors.fgSecondary
+                        )
+                    )
+                }
                 // 金额
                 OutlinedTextField(
                     value = amountText,
@@ -971,6 +1010,7 @@ private fun EditTransactionDialog(
                         onSave(
                             transaction.copy(
                                 amount = amount,
+                                type = selectedType,
                                 merchant = merchant.ifBlank { null },
                                 note = note.ifBlank { null },
                                 paymentMethod = paymentMethod.trim().ifBlank { "其他" },
