@@ -80,15 +80,7 @@
 
 ## 🚀 安装方式
 
-### 方式一：下载 APK（推荐）
-
-1. 打开 [Releases](https://github.com/CCC-QY/LedgerSee/releases/latest)
-2. 下载最新 `*.apk`（需挂在对应 Release 附件中）
-3. 手机安装时允许「安装未知应用」
-
-已安装旧版时，也可在 App 内「检查更新」或等待启动自动提示后应用内下载安装。
-
-### 方式二：自行编译
+### 自行编译
 
 ```bash
 git clone https://github.com/CCC-QY/LedgerSee.git
