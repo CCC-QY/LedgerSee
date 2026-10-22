@@ -30,6 +30,7 @@ import com.smartledger.ui.theme.SmartLedgerColors
 @Composable
 fun RecordScreen(
     onSaved: () -> Unit = {},
+    onImportScreenshot: () -> Unit = {},
     viewModel: RecordViewModel = viewModel()
 ) {
     var transactionType by remember { mutableStateOf("expense") }
@@ -52,11 +53,29 @@ fun RecordScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
+            // ═══ 截图导入入口 ═══
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = onImportScreenshot) {
+                    Icon(
+                        Icons.Outlined.AddPhotoAlternate,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("从截图导入", color = SmartLedgerColors.accent)
+                }
+            }
+
             // ═══ 顶部：类型切换 ═══
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp),
+                    .padding(top = 4.dp),
                 horizontalArrangement = Arrangement.Center
             ) {
                 TypeTab(

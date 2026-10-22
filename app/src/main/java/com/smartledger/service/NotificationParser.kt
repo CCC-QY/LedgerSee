@@ -48,7 +48,64 @@ object NotificationParser {
     private val INCOME_KEYWORDS = listOf(
         "退款", "退回", "到账", "收款", "转入", "已收", "存入",
         "收入", "入账", "已到账", "退款成功", "红包", "奖励",
-        "工资", "奖金", "利息", "返现", "报销"
+        "工资", "奖金", "利息", "返现", "报销", "收到转账", "转账到账"
+    )
+
+    /**
+     * 渠道名本身包含「支付」二字（支付宝 / 微信支付），不能参与收支方向判断。
+     * 否则任何支付宝收入通知都会同时命中支出关键词。
+     */
+    private val CHANNEL_NAME_TOKENS = listOf(
+        "微信支付", "支付宝", "云闪付", "抖音支付", "京东支付",
+        "美团支付", "拼多多支付", "银行卡支付"
+    )
+
+    /**
+     * 收入金额的统一兜底规则：不区分渠道，同时兼容 ¥ / ￥ / 元 / 无单位。
+     * 渠道专属规则放在前面，这里负责补漏，避免「支付宝退款¥42.75」这类被漏记。
+     */
+    private val commonIncomePatterns = listOf(
+        Regex(
+            "(?:已收款|收款|退款成功|退款到账|退款|退回|已到账|到账|已入账|入账|" +
+                "转入|存入|收入|收到转账|转账到账)[^\\d]{0,12}?[￥¥]?\\s*$AMOUNT\\s*元?"
+        ),
+        Regex("一笔${AMOUNT}元的收入"),
+        Regex("红包[^\\d]{0,8}?[￥¥]?\\s*$AMOUNT\\s*元?")
+    )
+
+    /**
+     * 退款场景优先取「退款金额 / 实退 / 实际退款」，避免先抓到订单金额。
+     * 例：退款成功，订单金额100元，退款金额50元 → 应记 50。
+     */
+    private val explicitRefundPatterns = listOf(
+        Regex("(?:退款金额|退款到账金额|到账金额|入账金额|实退金额|实际退款|实退款|实退)[：:]?\\s*[￥¥]?\\s*$AMOUNT\\s*元?"),
+        Regex("退款[：:]?\\s*[￥¥]?\\s*$AMOUNT\\s*元?")
+    )
+
+    /** 退款还未成功 / 已失败：不能提前记为收入，否则真正到账后会重复记账 */
+    private val REFUND_SUCCESS_MARKERS = listOf(
+        "退款成功", "退款到账", "已退款", "已到账", "已退回", "已入账", "已原路退回"
+    )
+    private val REFUND_PENDING_MARKERS = listOf(
+        "申请", "审核", "处理中", "受理", "已提交", "提交成功", "预计", "将于",
+        "将在", "失败", "无法", "未成功", "尚未", "待处理", "待入账", "待到账",
+        "原路退回", "工作日"
+    )
+
+    /** 条件式营销文案：没有明确完成动作时，不应入账 */
+    private val CONDITIONAL_MARKETING_MARKERS = listOf(
+        "可享", "可办理", "可申请", "可分期", "分期优惠", "分期免息", "免息",
+        "低至", "最高可", "最高享", "立减", "满减", "活动期间", "专属福利",
+        "点击领取", "立即领取", "立即申请", "立即办理", "账单分期",
+        "最低还款", "年化利率", "限时优惠", "分期"
+    )
+
+    /** 明确的完成态动词：出现后才允许忽略上面的营销词 */
+    private val DEFINITIVE_COMPLETION_MARKERS = listOf(
+        "已支付", "支付成功", "成功支付", "付款成功", "成功付款", "已付款",
+        "已扣款", "扣款成功", "交易成功", "消费成功", "已消费", "已支出",
+        "已收款", "收款成功", "退款成功", "退款到账", "已退款", "已到账",
+        "已退回", "已入账", "入账成功", "已存入", "已转入", "使用【"
     )
 
     // ═══════════════════════════════════════════════════════
@@ -307,61 +364,116 @@ object NotificationParser {
             packageName.contains("ugc.live")
     }
 
-    /**
-     * 明确的支付/退款确认信号。
-     * 注意：不能仅因出现「微信支付」+「元」就放行（企业号「每天5元干饭」会误伤）。
-     */
-    fun hasStrongPaymentSignal(text: String): Boolean {
-        if (text.contains("使用【") && text.contains("支付")) return true
-        if (text.contains("成功支付") || text.contains("支付成功")) return true
-        if (text.contains("付款成功") || text.contains("成功付款")) return true
-        if (text.contains("已支付") || text.contains("已付款")) return true
-        if (Regex("付款[￥¥]").containsMatchIn(text)) return true
-        if (Regex("支付[￥¥]").containsMatchIn(text)) return true
-        if (Regex("向.+?付款[￥¥]").containsMatchIn(text)) return true
-        if (Regex("一笔[\\d.]+元的支出").containsMatchIn(text)) return true
-        if (Regex("一笔[\\d.]+元的收入").containsMatchIn(text)) return true
-        if (Regex("收款[￥¥]").containsMatchIn(text)) return true
-        // 付款码：常与「已支付¥xx」或「付款成功」一起出现
-        if (text.contains("付款码") && (
-                text.contains("已支付") || text.contains("付款成功") ||
-                    text.contains("成功付款") || Regex("[￥¥]\\s*[\\d.]+").containsMatchIn(text)
-                )
-        ) {
-            return true
+    /** 聊天标题是否为官方支付通知；聊天消息标题通常是联系人/群名 */
+    fun isOfficialPaymentSender(title: String): Boolean {
+        val official = listOf(
+            "微信支付", "微信收款助手", "收款小账本", "支付宝", "支付宝通知",
+            "云闪付", "抖音支付", "京东支付", "美团支付"
+        )
+        return official.any { title.contains(it) }
+    }
+
+    /** 退款申请 / 审核中 / 预计到账 / 失败：一律不提前记收入 */
+    fun isRefundPendingOrFailed(text: String): Boolean {
+        if (!text.contains("退款") && !text.contains("退回")) return false
+        if (REFUND_SUCCESS_MARKERS.any { text.contains(it) }) return false
+        return REFUND_PENDING_MARKERS.any { text.contains(it) } ||
+            Regex("退款[^。；;]{0,8}中").containsMatchIn(text)
+    }
+
+    private fun stripChannelNames(text: String): String {
+        var s = text
+        for (token in CHANNEL_NAME_TOKENS) {
+            s = s.replace(token, " ")
         }
-        // 微信支付：必须带确认动词，不能仅有「元」
+        return s
+    }
+
+    private fun hasConditionalMarketingSignal(text: String): Boolean =
+        CONDITIONAL_MARKETING_MARKERS.any { text.contains(it) }
+
+    private fun hasDefinitiveCompletionSignal(text: String): Boolean =
+        DEFINITIVE_COMPLETION_MARKERS.any { text.contains(it) }
+
+    /** 是否有真实的资金动作，用于区分「消费 100 元 + 积分到账」和纯积分推送 */
+    private fun hasMoneyMovementSignal(text: String): Boolean {
+        val t = stripChannelNames(text)
+        val markers = listOf(
+            "消费", "支出", "支付", "付款", "收款", "退款",
+            "转入", "转出", "扣款", "存入", "取现"
+        )
+        return markers.any { t.contains(it) }
+    }
+
+    /**
+     * 明确的支出信号。
+     * 与收入信号分开，避免把「收款¥100」判成支出。
+     */
+    fun hasStrongExpenseSignal(text: String): Boolean {
+        val t = stripChannelNames(text)
+        if (t.contains("使用【") && t.contains("支付")) return true
+        if (t.contains("成功支付") || t.contains("支付成功") ||
+            t.contains("付款成功") || t.contains("成功付款")
+        ) return true
+        if (t.contains("已支付") || t.contains("已付款") || t.contains("已扣款") ||
+            t.contains("扣款成功") || t.contains("交易成功") ||
+            t.contains("已消费") || t.contains("消费成功") || t.contains("已支出")
+        ) return true
+        if (Regex("(?:付款|支付|消费|支出|扣款|转出)\\s*[￥¥]\\s*[\\d,]+").containsMatchIn(t)) return true
+        if (Regex(
+                "(?:支出|消费|扣款|转出|支付|付款)\\s*(?:人民币)?\\s*[￥¥]?\\s*[\\d,]+"
+            ).containsMatchIn(t)
+        ) return true
+        if (Regex("一笔[\\d,]+(?:\\.[\\d]{1,2})?元的支出").containsMatchIn(t)) return true
+        if (t.contains("支出(") || t.contains("消费(")) return true
+        // 付款码：常与「已支付¥xx」或「付款成功」一起出现
+        if (t.contains("付款码") && (
+                t.contains("已支付") || t.contains("付款成功") ||
+                    t.contains("成功付款") || Regex("[￥¥]\\s*[\\d.]+").containsMatchIn(t)
+                )
+        ) return true
+        // 渠道名已从 t 中剥离，这里用原文兜底，供 Listener 前置过滤使用
         if (text.contains("微信支付") && (
                 text.contains("已支付") || text.contains("付款") ||
-                    text.contains("收款") || text.contains("退款") ||
                     Regex("支付[￥¥]").containsMatchIn(text)
                 )
-        ) {
-            return true
-        }
+        ) return true
         if (text.contains("支付宝") && (
                 text.contains("付款") || text.contains("成功付款") ||
-                    text.contains("的支出") || text.contains("的收入") ||
-                    text.contains("退款")
+                    text.contains("的支出")
                 )
-        ) {
-            return true
-        }
-        // 退款入账（排除提现提醒）
-        if ((text.contains("退款成功") || text.contains("退款到账") ||
-                (text.contains("退款") && (text.contains("元") || text.contains("¥") || text.contains("￥")))) &&
-            !text.contains("提现") && !text.contains("尚未处理")
-        ) {
-            return true
-        }
-        // 银行动账
-        if (text.contains("动账") || text.contains("支出(") || text.contains("收入(")) return true
+        ) return true
         if ((text.contains("储蓄卡") || text.contains("借记卡") || text.contains("信用卡")) &&
             (text.contains("支付") || text.contains("消费") || text.contains("扣款"))
-        ) {
-            return true
-        }
+        ) return true
         return false
+    }
+
+    /**
+     * 明确的收入信号。退款必须已完成（pending/失败已在 parse 入口拦截）。
+     */
+    fun hasStrongIncomeSignal(text: String): Boolean {
+        val t = stripChannelNames(text)
+        if (Regex("(?:已收款|收款)[^\\d]{0,8}?[￥¥]?\\s*[\\d,]+").containsMatchIn(t)) return true
+        if (t.contains("退款成功") || t.contains("退款到账") || t.contains("已退款") ||
+            t.contains("已到账") || t.contains("已退回") || t.contains("已入账")
+        ) return true
+        if (t.contains("收入(") || t.contains("网上银行收入") || t.contains("工资")) return true
+        if (Regex(
+                "(?:收入|存入|转入|到账|入账|红包|收到转账|退款|退回)" +
+                    "[^\\d]{0,12}?[￥¥]?\\s*[\\d,]+(?:\\.[\\d]{1,2})?"
+            ).containsMatchIn(t)
+        ) return true
+        if (Regex("一笔[\\d,]+(?:\\.[\\d]{1,2})?元的收入").containsMatchIn(t)) return true
+        return false
+    }
+
+    /**
+     * 明确的支付/退款确认信号（收入或支出）。
+     * 保留给 Listener 白名单过滤；方向判断请用上面两个按方向拆分的函数。
+     */
+    fun hasStrongPaymentSignal(text: String): Boolean {
+        return hasStrongExpenseSignal(text) || hasStrongIncomeSignal(text)
     }
 
     /**
@@ -369,6 +481,27 @@ object NotificationParser {
      * 例：京东省钱金额；微信企业号「每天5元干饭」「5元请你吃外卖」
      */
     fun isPromotionalOrNonPayment(text: String): Boolean {
+        // 积分 / 券类「到账」不是现金收入；带明确完成动作的真实支付仍放行
+        val rewardNoise = listOf(
+            "积分到账", "积分兑换", "领积分", "领券", "待领取",
+            "红包券", "外卖券", "抵用券"
+        )
+        if (rewardNoise.any { text.contains(it) } &&
+            !hasDefinitiveCompletionSignal(text) &&
+            !hasMoneyMovementSignal(text)
+        ) {
+            return true
+        }
+        // 条件式营销优先于银行动账信号：尾号 + 消费 + 可享分期 不能静默入账
+        if (hasConditionalMarketingSignal(text) && !hasDefinitiveCompletionSignal(text)) {
+            return true
+        }
+        // 未来到账（工资预计到账 / 退款将于…）不是已发生收入
+        if (Regex("(?:预计|将于|将在|计划于|待)[^。；;]{0,12}(?:到账|入账|退回)")
+                .containsMatchIn(text) && !hasDefinitiveCompletionSignal(text)
+        ) {
+            return true
+        }
         // 银行真实动账优先放行
         if (hasBankLedgerSignal(text)) return false
         if (hasStrongPaymentSignal(text)) return false
@@ -377,6 +510,7 @@ object NotificationParser {
             "省钱明细", "点击查看", "相当于",
             "提现提醒", "尚未处理", "将于", "过期", "现金打款",
             "可用额度", "信用额度", "剩余额度", "账户剩余", "剩余可用额度",
+            "本期账单", "账单金额", "应还金额", "账单分期",
             "验证码", "登录验证", "登录成功", "账单日", "账单已出",
             "最低还款", "分期付款", "安全锁", "网银登录", "手机银行登录",
             // 银行营销 / 非动账（无「动账/支出(」时会被拦截）
@@ -602,9 +736,14 @@ object NotificationParser {
                 }
 
                 val matchedWhole = match.value
+                // 括号类银行模板只匹配到数字，后面的「元」需要单独向前看一位，
+                // 否则「支出(...)79元」会被误判为截断金额而每次都要确认。
+                val tail = maskedText.substring(match.range.last + 1).trimStart()
+                val hasCurrencyAfter = tail.startsWith("元") ||
+                    tail.startsWith("¥") || tail.startsWith("￥")
                 val hasYuanOrSymbol = matchedWhole.contains("元") ||
                     matchedWhole.contains("￥") || matchedWhole.contains("¥") ||
-                    amountStr.contains('.')
+                    amountStr.contains('.') || hasCurrencyAfter
                 val truncatedDots = rawText.contains("....") || rawText.contains("…") ||
                     Regex("\\d\\.{2,}").containsMatchIn(rawText)
                 if (hasYuanOrSymbol && !truncatedDots) {
@@ -662,30 +801,15 @@ object NotificationParser {
             return ParseConfidence.UNCERTAIN to "疑似营销推送"
         }
 
-        // 明确支出信号（全渠道）
-        val clearExpense = hasStrongPaymentSignal(rawText) ||
-            (hasBankLedgerSignal(rawText) && (
-                rawText.contains("支出") || rawText.contains("消费") ||
-                    rawText.contains("扣款") || rawText.contains("转出") ||
-                    rawText.contains("动账")
-                ) && type == "expense")
-
-        // 明确收入信号（全渠道）
-        val clearIncome = (
-            rawText.contains("退款成功") || rawText.contains("退款到账") ||
-                (rawText.contains("退款") && (rawText.contains("元") || rawText.contains("¥") || rawText.contains("￥"))) ||
-                Regex("收款[￥¥]").containsMatchIn(rawText) ||
-                Regex("一笔[\\d.]+元的收入").containsMatchIn(rawText) ||
-                (hasBankLedgerSignal(rawText) && (
-                    rawText.contains("收入") || rawText.contains("存入") ||
-                        rawText.contains("到账") || rawText.contains("转入")
-                    ))
-            ) && type == "income" && !rawText.contains("提现提醒")
-
-        return when {
-            type == "expense" && clearExpense -> ParseConfidence.HIGH to null
-            type == "income" && clearIncome -> ParseConfidence.HIGH to null
-            else -> ParseConfidence.UNCERTAIN to "未能明确识别为真实收支，请确认"
+        // 按方向取信号：收入通知不应被「支付」渠道名带成明确支出
+        val clearSignal = when (type) {
+            "income" -> hasStrongIncomeSignal(rawText)
+            else -> hasStrongExpenseSignal(rawText)
+        }
+        return if (clearSignal) {
+            ParseConfidence.HIGH to null
+        } else {
+            ParseConfidence.UNCERTAIN to "未能明确识别为真实收支，请确认"
         }
     }
 
@@ -702,10 +826,24 @@ object NotificationParser {
     // ═══════════════════════════════════════════════════════
     // 核心解析
     // ═══════════════════════════════════════════════════════
-    fun parse(title: String, content: String, packageName: String): ParsedPayment? {
+    fun parse(
+        title: String,
+        content: String,
+        packageName: String,
+        isChatMessage: Boolean = false
+    ): ParsedPayment? {
         val rawText = normalizeNotificationText("$title $content")
 
+        // 微信/支付宝的聊天消息也会走通知监听，不能把联系人发来的「支付¥100」当成账单
+        if (isChatMessage && isStrictChatPayApp(packageName) &&
+            !isOfficialPaymentSender(title)
+        ) {
+            return null
+        }
+
         if (isCreditProductPayment(rawText)) return null
+        // 退款申请 / 审核中 / 预计到账 / 失败：不能提前记收入
+        if (isRefundPendingOrFailed(rawText)) return null
         if (isPromotionalOrNonPayment(rawText)) return null
 
         // 电商 / 微信 / 支付宝 / 抖音：必须有明确支付确认，禁止「见元就记」
@@ -722,12 +860,14 @@ object NotificationParser {
 
         // 去掉尾号/卡号末四位，防止「尾号7619」「储蓄卡(7619)」被当成金额
         val text = maskCardTailNumbers(rawText)
+        // 渠道名含「支付」二字，方向判断前先剥离；金额和商户仍使用原文
+        val directionText = stripChannelNames(text)
 
         val paymentMethod = identifyPaymentMethod(packageName, rawText)
 
-        // 判断是收入还是支出
-        val isIncome = INCOME_KEYWORDS.any { rawText.contains(it) }
-        val isExpense = EXPENSE_KEYWORDS.any { rawText.contains(it) }
+        // 判断是收入还是支出（只看去掉渠道名后的正文）
+        val isIncome = INCOME_KEYWORDS.any { directionText.contains(it) }
+        val isExpense = EXPENSE_KEYWORDS.any { directionText.contains(it) }
 
         // 如果同时包含收入和支出关键词，优先判断
         val type: String
@@ -741,27 +881,33 @@ object NotificationParser {
             type = "expense"
             amountPatterns = getExpensePatterns(paymentMethod, packageName)
         } else if (isIncome && isExpense) {
-            // 两者都有：优先看结构「收入(…) / 支出(…) / 工资」，避免动账类文案误判
+            // 两者都有：明确结构 > 泛化动词。
+            // 收入结构优先，避免「退款」被标题的渠道名带成支出。
             when {
-                rawText.contains("收入(") || rawText.contains("网上银行收入") ||
-                    rawText.contains("工资") || rawText.contains("存入") ||
-                    rawText.contains("退款") || rawText.contains("退回") ||
-                    (rawText.contains("到账") && !rawText.contains("提现") &&
-                        !rawText.contains("支出(") && !rawText.contains("消费(")) -> {
+                directionText.contains("收入(") || directionText.contains("网上银行收入") ||
+                    directionText.contains("工资") || directionText.contains("存入") ||
+                    directionText.contains("退款") || directionText.contains("退回") ||
+                    directionText.contains("收款") || directionText.contains("已收") ||
+                    directionText.contains("红包") -> {
                     type = "income"
                     amountPatterns = getIncomePatterns(paymentMethod, packageName)
-                    typeAmbiguous = false
                 }
-                rawText.contains("支出(") || rawText.contains("消费(") ||
-                    rawText.contains("扣款") || rawText.contains("转出") -> {
+                directionText.contains("支出(") || directionText.contains("消费(") ||
+                    directionText.contains("扣款") || directionText.contains("转出") ||
+                    directionText.contains("支出") || directionText.contains("消费") ||
+                    directionText.contains("已支付") || directionText.contains("支付成功") ||
+                    directionText.contains("付款成功") -> {
                     type = "expense"
                     amountPatterns = getExpensePatterns(paymentMethod, packageName)
-                    typeAmbiguous = false
+                }
+                directionText.contains("到账") && !directionText.contains("提现") -> {
+                    type = "income"
+                    amountPatterns = getIncomePatterns(paymentMethod, packageName)
                 }
                 else -> {
                     type = "expense"
                     amountPatterns = getExpensePatterns(paymentMethod, packageName)
-                    typeAmbiguous = !hasStrongPaymentSignal(rawText) && !hasBankLedgerSignal(rawText)
+                    typeAmbiguous = true
                 }
             }
         } else {
@@ -807,7 +953,7 @@ object NotificationParser {
         }
 
         val (confidence, reason) = assessConfidence(
-            rawText, amountHit.isClear, typeAmbiguous, type
+            directionText, amountHit.isClear, typeAmbiguous, type
         )
 
         // 生成去重key
@@ -844,7 +990,7 @@ object NotificationParser {
     }
 
     private fun getIncomePatterns(paymentMethod: String, packageName: String): List<Regex> {
-        return when {
+        val channelPatterns = when {
             packageName.contains("tencent.mm") -> wechatIncomePatterns
             packageName.contains("AlipayGphone") -> alipayIncomePatterns
             packageName.contains("unionpay") -> unionpayIncomePatterns
@@ -856,5 +1002,7 @@ object NotificationParser {
             packageName.contains("chinapost") || packageName.contains("psbc") -> psbcIncomePatterns
             else -> bankIncomePatterns
         }
+        // 退款金额优先于订单金额；渠道规则先跑，统一兜底规则负责补 ¥/元/无单位 的漏网格式
+        return explicitRefundPatterns + channelPatterns + commonIncomePatterns
     }
 }

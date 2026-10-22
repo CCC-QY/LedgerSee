@@ -139,6 +139,8 @@ class PaymentNotificationListener : NotificationListenerService() {
         }
         var postTime = sbn.postTime  // 通知发布时间，比 currentTimeMillis 更准确
         var text = NotificationParser.normalizeNotificationText("$title $content")
+        // 微信/支付宝/抖音的聊天消息也会走这里；标记后由解析器只放行官方支付标题
+        var isChatMessage = isChatMessageNotification(notification, extras)
 
         val isGroupSummary =
             notification.flags and Notification.FLAG_GROUP_SUMMARY != 0
@@ -157,6 +159,7 @@ class PaymentNotificationListener : NotificationListenerService() {
                 title = enriched.title
                 content = enriched.content
                 postTime = enriched.postTime
+                isChatMessage = isChatMessage || enriched.isChatMessage
                 text = NotificationParser.normalizeNotificationText("$title $content")
                 Log.d(TAG, "Enriched grouped pay notice ($packageName): $text")
             } else {
@@ -190,6 +193,12 @@ class PaymentNotificationListener : NotificationListenerService() {
         // 营销 / 额度 / 物流 / 提现提醒等
         if (NotificationParser.isPromotionalOrNonPayment(text)) {
             Log.d(TAG, "Promotional/non-payment, skip: $text")
+            return
+        }
+
+        // 退款申请 / 审核中 / 预计到账 / 失败：等真正到账再记
+        if (NotificationParser.isRefundPendingOrFailed(text)) {
+            Log.d(TAG, "Refund not completed, skip: $text")
             return
         }
 
@@ -257,7 +266,9 @@ class PaymentNotificationListener : NotificationListenerService() {
             return
         }
 
-        val parsed = NotificationParser.parse(title, content, packageName)
+        val parsed = NotificationParser.parse(
+            title, content, packageName, isChatMessage = isChatMessage
+        )
         if (parsed == null) {
             Log.d(TAG, "Parse failed for: $title - $content")
             if (isDebugEnabled()) {
@@ -479,7 +490,8 @@ class PaymentNotificationListener : NotificationListenerService() {
     private data class EnrichedPayText(
         val title: String,
         val content: String,
-        val postTime: Long
+        val postTime: Long,
+        val isChatMessage: Boolean
     )
 
     /**
@@ -507,10 +519,11 @@ class PaymentNotificationListener : NotificationListenerService() {
 
         fun pickFrom(list: List<StatusBarNotification>, tag: String): EnrichedPayText? {
             for (child in list) {
-                val extras = child.notification?.extras ?: continue
+                val childNotification = child.notification ?: continue
+                val extras = childNotification.extras ?: continue
                 val (t, c) = extractNotificationText(extras)
                 // ticker 有时比 extras 更完整
-                val ticker = child.notification?.tickerText?.toString()?.trim().orEmpty()
+                val ticker = childNotification.tickerText?.toString()?.trim().orEmpty()
                 val combined = NotificationParser.normalizeNotificationText(
                     listOf(t, c, ticker).filter { it.isNotBlank() }.joinToString(" ")
                 )
@@ -522,7 +535,8 @@ class PaymentNotificationListener : NotificationListenerService() {
                     return EnrichedPayText(
                         t.ifBlank { ticker },
                         c.ifBlank { ticker },
-                        child.postTime
+                        child.postTime,
+                        isChatMessageNotification(childNotification, extras)
                     )
                 }
             }
@@ -542,6 +556,21 @@ class PaymentNotificationListener : NotificationListenerService() {
         pickFrom(recent, "recentSamePkg")?.let { return it }
 
         return null
+    }
+
+    /**
+     * 是否是聊天消息通知（而非支付通知）。
+     * 微信/支付宝的支付通知仍是普通通知；聊天消息通常标记为 CATEGORY_MESSAGE，
+     * 或使用 MessagingStyle（EXTRA_TEMPLATE / EXTRA_MESSAGES）。
+     */
+    private fun isChatMessageNotification(
+        notification: Notification,
+        extras: android.os.Bundle
+    ): Boolean {
+        if (notification.category == Notification.CATEGORY_MESSAGE) return true
+        val template = extras.getCharSequence(Notification.EXTRA_TEMPLATE)?.toString().orEmpty()
+        if (template.contains("MessagingStyle", ignoreCase = true)) return true
+        return extras.containsKey(Notification.EXTRA_MESSAGES)
     }
 
     private fun isMonitoredPackage(packageName: String): Boolean {

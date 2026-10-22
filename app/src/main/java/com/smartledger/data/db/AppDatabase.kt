@@ -4,10 +4,13 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.smartledger.data.db.dao.AiReportDao
 import com.smartledger.data.db.dao.BudgetDao
 import com.smartledger.data.db.dao.CategoryDao
 import com.smartledger.data.db.dao.TransactionDao
+import com.smartledger.data.db.entity.AiReport
 import com.smartledger.data.db.entity.Budget
 import com.smartledger.data.db.entity.Category
 import com.smartledger.data.db.entity.CategoryBudget
@@ -17,19 +20,46 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 @Database(
-    entities = [Transaction::class, Category::class, Budget::class, CategoryBudget::class],
-    version = 1,
-    exportSchema = false
+    entities = [
+        Transaction::class,
+        Category::class,
+        Budget::class,
+        CategoryBudget::class,
+        AiReport::class
+    ],
+    version = 2,
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
     abstract fun transactionDao(): TransactionDao
     abstract fun categoryDao(): CategoryDao
     abstract fun budgetDao(): BudgetDao
+    abstract fun aiReportDao(): AiReportDao
 
     companion object {
         @Volatile
         private var INSTANCE: AppDatabase? = null
+
+        /** v1 → v2：新增 AI 月报缓存表 */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `ai_reports` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`month` TEXT NOT NULL, " +
+                        "`tone` TEXT NOT NULL, " +
+                        "`content` TEXT NOT NULL, " +
+                        "`factsText` TEXT NOT NULL, " +
+                        "`model` TEXT NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_ai_reports_month_tone` " +
+                        "ON `ai_reports` (`month`, `tone`)"
+                )
+            }
+        }
 
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -38,6 +68,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smart_ledger.db"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

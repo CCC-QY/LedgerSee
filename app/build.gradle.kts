@@ -15,8 +15,8 @@ android {
         applicationId = "com.smartledger"
         minSdk = 26
         targetSdk = 35
-        versionCode = 29
-        versionName = "1.0.28"
+        versionCode = 32
+        versionName = "1.2.0"
     }
 
     // ═══ 签名配置（从 local.properties 安全读取）═══
@@ -60,6 +60,10 @@ android {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // Compose BOM
     val composeBom = platform(libs.androidx.compose.bom)
@@ -91,6 +95,12 @@ dependencies {
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+
+    // OCR（本地中文识别，不上传截图）
+    implementation(libs.mlkit.text.recognition.chinese)
+
+    // Unit tests
+    testImplementation(libs.junit)
 
     // Debug
     debugImplementation(libs.androidx.compose.ui.tooling)

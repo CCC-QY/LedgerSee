@@ -30,6 +30,7 @@ fun ProfileScreen(
     onNavigateToCategory: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onNavigateToBackup: () -> Unit = {},
+    onNavigateToAi: () -> Unit = {},
     onExport: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -121,6 +122,16 @@ fun ProfileScreen(
                     .padding(horizontal = 20.dp)
                     .background(SmartLedgerColors.surface, RoundedCornerShape(16.dp))
             ) {
+                MenuItem(
+                    icon = Icons.Outlined.AutoAwesome,
+                    label = "AI 财务复盘",
+                    onClick = onNavigateToAi
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    color = SmartLedgerColors.border,
+                    thickness = 0.5.dp
+                )
                 MenuItem(
                     icon = Icons.Outlined.Schedule,
                     label = "预算管理",

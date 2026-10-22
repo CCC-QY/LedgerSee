@@ -33,7 +33,10 @@ import com.smartledger.util.CurrencyUtil
 import com.smartledger.util.DateUtil
 
 @Composable
-fun StatisticsScreen(viewModel: StatisticsViewModel = viewModel()) {
+fun StatisticsScreen(
+    onNavigateToAi: () -> Unit = {},
+    viewModel: StatisticsViewModel = viewModel()
+) {
     val selectedPeriod by viewModel.selectedPeriod.collectAsState(initial = "month")
     val periodExpense by viewModel.periodExpense.collectAsState(initial = 0.0)
     val periodIncome by viewModel.periodIncome.collectAsState(initial = 0.0)
@@ -90,7 +93,30 @@ fun StatisticsScreen(viewModel: StatisticsViewModel = viewModel()) {
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(32.dp)) }
+            item {
+                Spacer(modifier = Modifier.height(18.dp))
+                OutlinedButton(
+                    onClick = onNavigateToAi,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .height(44.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = SmartLedgerColors.accent
+                    )
+                ) {
+                    Icon(
+                        Icons.Outlined.AutoAwesome,
+                        contentDescription = null,
+                        modifier = Modifier.size(17.dp)
+                    )
+                    Spacer(modifier = Modifier.width(7.dp))
+                    Text("用 AI 复盘账单", fontWeight = FontWeight.Medium)
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(20.dp)) }
 
             // ═══ 环形图 + 总支出 ═══
             item {

@@ -26,6 +26,7 @@ import com.smartledger.ui.home.HomeScreen
 import com.smartledger.ui.home.SearchScreen
 import com.smartledger.ui.home.SearchViewModel
 import com.smartledger.ui.components.SmartLedgerDialog
+import com.smartledger.ui.ai.AiScreen
 import com.smartledger.ui.navigation.Screen
 import com.smartledger.ui.navigation.bottomNavItems
 import com.smartledger.ui.profile.ProfileScreen
@@ -325,7 +326,9 @@ fun MainApp() {
     Scaffold(
         containerColor = SmartLedgerColors.bg,
         bottomBar = {
-            if (currentRoute != "permission" && currentRoute != "search") {
+            if (currentRoute != "permission" && currentRoute != "search" &&
+                currentRoute != "ai" && currentRoute != "screenshot"
+            ) {
                 NavigationBar(
                     containerColor = SmartLedgerColors.surface,
                     tonalElevation = 0.dp
@@ -393,11 +396,16 @@ fun MainApp() {
                         navController.navigate(Screen.Home.route) {
                             popUpTo(Screen.Home.route) { inclusive = true }
                         }
+                    },
+                    onImportScreenshot = {
+                        navController.navigate("screenshot")
                     }
                 )
             }
             composable(Screen.Statistics.route) {
-                StatisticsScreen()
+                StatisticsScreen(
+                    onNavigateToAi = { navController.navigate("ai") }
+                )
             }
             composable(Screen.Profile.route) {
                 ProfileScreen(
@@ -413,8 +421,24 @@ fun MainApp() {
                     onNavigateToBackup = {
                         navController.navigate("backup")
                     },
+                    onNavigateToAi = {
+                        navController.navigate("ai")
+                    },
                     onExport = {
                         navController.navigate("export")
+                    }
+                )
+            }
+            composable("ai") {
+                AiScreen(onBack = { navController.popBackStack() })
+            }
+            composable("screenshot") {
+                com.smartledger.ui.screenshot.ScreenshotImportScreen(
+                    onBack = { navController.popBackStack() },
+                    onSaved = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Home.route) { inclusive = true }
+                        }
                     }
                 )
             }

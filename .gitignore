@@ -94,3 +94,6 @@ Thumbs.db
 
 # Project specific
 /smart-ledger-app.md
+
+# WorkBuddy local project data (not part of the app)
+.workbuddy/
