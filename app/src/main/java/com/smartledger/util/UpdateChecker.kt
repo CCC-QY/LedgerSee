@@ -21,7 +21,7 @@ import java.net.URL
 object UpdateChecker {
 
     private const val TAG = "UpdateChecker"
-    private const val REPO = "huanghhcri/SmartLedger"
+    private const val REPO = "CCC-QY/LedgerSee"
     private const val API_URL = "https://api.github.com/repos/$REPO/releases/latest"
 
     data class UpdateInfo(
