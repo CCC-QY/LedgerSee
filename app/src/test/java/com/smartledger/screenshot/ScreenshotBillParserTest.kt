@@ -104,6 +104,24 @@ class ScreenshotBillParserTest {
     }
 
     @Test
+    fun `item name is separated from merchant`() {
+        val text = """
+            账单详情
+            美团外卖
+            商品名称
+            牛肉面
+            ¥35.50
+            商户名称 老王面馆
+            2026-10-22 12:30
+        """.trimIndent()
+
+        val bill = ScreenshotBillParser.parse(text, now, zone)
+        assertEquals(35.50, bill.amount ?: 0.0, 0.001)
+        assertEquals("老王面馆", bill.merchant)
+        assertEquals("牛肉面", bill.foodName)
+    }
+
+    @Test
     fun `no amount is returned instead of inventing one`() {
         val text = """
             订单详情

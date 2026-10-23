@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smartledger.data.db.entity.Category
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
 import com.smartledger.ui.theme.SmartLedgerColors
 import com.smartledger.util.CurrencyUtil
 import com.smartledger.util.DateUtil
@@ -260,11 +261,16 @@ private fun SearchResultItem(transaction: Transaction, categoryName: String) {
                     color = SmartLedgerColors.fg
                 )
                 Row {
-                    val subtitle = buildString {
-                        transaction.merchant?.let { append(it) }
-                        if (transaction.merchant != null && transaction.note != null) append(" · ")
-                        transaction.note?.let { append(it) }
-                    }
+                    val subtitle = buildList {
+                        DiningDetails.mealLabel(transaction.mealType)?.let { add(it) }
+                        val food = transaction.foodName?.takeIf { it.isNotBlank() }
+                        if (food != null) {
+                            add(food)
+                        } else {
+                            transaction.merchant?.let { add(it) }
+                        }
+                        transaction.note?.let { add(it) }
+                    }.joinToString(" · ")
                     if (subtitle.isNotBlank()) {
                         Text(
                             text = subtitle,

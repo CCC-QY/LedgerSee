@@ -4,6 +4,9 @@ import android.content.Context
 import android.net.Uri
 import com.smartledger.data.db.AppDatabase
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
+import com.smartledger.data.model.FoodCategory
+import com.smartledger.data.model.MealType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -73,6 +76,9 @@ object CsvImporter {
                     val method = fields[6]
                     val note = if (fields.size > 7) fields[7] else ""
                     val source = if (fields.size > 8) fields[8] else "手动"
+                    val mealRaw = if (fields.size > 9) fields[9] else ""
+                    val foodCategoryRaw = if (fields.size > 10) fields[10] else ""
+                    val foodNameRaw = if (fields.size > 11) fields[11] else ""
 
                     val amount = amountStr.toDoubleOrNull() ?: return@forEach
                     if (amount <= 0) return@forEach
@@ -111,13 +117,24 @@ object CsvImporter {
                     val categoryId = categoryMap["$typeEn:$categoryName"]?.id
                         ?: categoryMap["$typeEn:其他"]?.id
 
+                    val noteVal = note.ifBlank { null }
+                    val auto = DiningDetails.autoFor(
+                        merchant = merchantVal,
+                        note = noteVal,
+                        time = dateTime,
+                        isDining = DiningDetails.isDining(categoryName, typeEn)
+                    )
                     val transaction = Transaction(
                         amount = amount,
                         type = typeEn,
                         categoryId = categoryId,
                         merchant = merchantVal,
                         paymentMethod = method.ifBlank { null },
-                        note = note.ifBlank { null },
+                        note = noteVal,
+                        mealType = MealType.fromLabel(mealRaw)?.key ?: auto?.mealType,
+                        foodCategory = FoodCategory.fromLabel(foodCategoryRaw)?.key
+                            ?: auto?.foodCategory,
+                        foodName = foodNameRaw.ifBlank { null },
                         source = if (source == "自动") "auto" else "manual",
                         notificationKey = null,
                         transactionTime = dateTime

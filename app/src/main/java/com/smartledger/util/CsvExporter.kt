@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import com.smartledger.data.db.AppDatabase
 import com.smartledger.data.db.entity.Category
+import com.smartledger.data.model.DiningDetails
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -71,7 +72,7 @@ object CsvExporter {
     ): Uri? {
         val sb = StringBuilder()
         sb.append('\uFEFF')
-        sb.append("日期,时间,类型,金额,分类,商户,支付方式,备注,来源\n")
+        sb.append("日期,时间,类型,金额,分类,商户,支付方式,备注,来源,餐次,餐饮品类,食物\n")
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.CHINA)
         val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.CHINA)
@@ -85,7 +86,13 @@ object CsvExporter {
             val method = escapeCsv(t.paymentMethod ?: "")
             val note = escapeCsv(t.note ?: "")
             val source = if (t.source == "auto") "自动" else "手动"
-            sb.append("$date,$time,$type,${t.amount},$category,$merchant,$method,$note,$source\n")
+            val meal = DiningDetails.mealLabel(t.mealType) ?: ""
+            val foodCategory = DiningDetails.foodCategoryLabel(t.foodCategory) ?: ""
+            val foodName = escapeCsv(t.foodName ?: "")
+            sb.append(
+                "$date,$time,$type,${t.amount},$category,$merchant,$method,$note,$source," +
+                    "$meal,$foodCategory,$foodName\n"
+            )
         }
 
         return BackupStorage.writeCsv(context, fileName, sb.toString())

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.smartledger.data.db.AppDatabase
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
 import com.smartledger.service.PendingConfirmStore
 import com.smartledger.service.SmartCategorizer
 import com.smartledger.ui.theme.SmartLedgerColors
@@ -308,6 +309,7 @@ class ConfirmPaymentActivity : ComponentActivity() {
             }
 
             var categoryId: Long? = null
+            var categoryName: String? = null
             try {
                 val categories = db.categoryDao().getAllOnce()
                 categoryId = SmartCategorizer.categorize(
@@ -317,8 +319,16 @@ class ConfirmPaymentActivity : ComponentActivity() {
                     categories = categories,
                     type = type
                 )
+                categoryName = categories.find { it.id == categoryId }?.name
             } catch (_: Exception) {
             }
+
+            val dining = DiningDetails.autoFor(
+                merchant = merchant,
+                note = null,
+                time = pending.transactionTime,
+                isDining = DiningDetails.isDining(categoryName, type)
+            )
 
             val id = db.transactionDao().insert(
                 Transaction(
@@ -328,6 +338,9 @@ class ConfirmPaymentActivity : ComponentActivity() {
                     merchant = merchant,
                     paymentMethod = pending.paymentMethod,
                     note = pending.reason?.let { "确认入账：$it" },
+                    mealType = dining?.mealType,
+                    foodCategory = dining?.foodCategory,
+                    foodName = dining?.foodName,
                     source = "auto",
                     notificationKey = pending.notificationKey,
                     transactionTime = pending.transactionTime

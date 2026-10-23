@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smartledger.data.db.entity.Category
+import com.smartledger.data.model.DiningDetails
+import com.smartledger.ui.components.DiningFields
 import com.smartledger.ui.components.PaymentChannelPicker
 import com.smartledger.ui.theme.SmartLedgerColors
 import kotlinx.coroutines.Dispatchers
@@ -150,7 +152,10 @@ fun ScreenshotImportScreen(
                             onCategory = viewModel::setCategory,
                             onPaymentMethod = viewModel::setPaymentMethod,
                             onNote = viewModel::setNote,
-                            onUseCurrentTime = viewModel::useCurrentTime
+                            onUseCurrentTime = viewModel::useCurrentTime,
+                            onMealType = viewModel::setMealType,
+                            onFoodCategory = viewModel::setFoodCategory,
+                            onFoodName = viewModel::setFoodName
                         )
                     }
 
@@ -330,7 +335,10 @@ private fun FormCard(
     onCategory: (Category) -> Unit,
     onPaymentMethod: (String) -> Unit,
     onNote: (String) -> Unit,
-    onUseCurrentTime: () -> Unit
+    onUseCurrentTime: () -> Unit,
+    onMealType: (String) -> Unit,
+    onFoodCategory: (String?) -> Unit,
+    onFoodName: (String) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -406,6 +414,18 @@ private fun FormCard(
                 selectedId = state.categoryId,
                 onSelect = onCategory
             )
+
+            val selectedCategory = state.categoriesForType.find { it.id == state.categoryId }
+            if (DiningDetails.isDining(selectedCategory?.name, state.type)) {
+                DiningFields(
+                    mealType = state.mealType,
+                    onMealTypeChange = onMealType,
+                    foodName = state.foodName,
+                    onFoodNameChange = onFoodName,
+                    foodCategory = state.foodCategory,
+                    onFoodCategoryChange = onFoodCategory
+                )
+            }
 
             PaymentChannelPicker(
                 selected = state.paymentMethod,

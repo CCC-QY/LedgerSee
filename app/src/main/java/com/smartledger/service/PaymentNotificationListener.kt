@@ -8,6 +8,7 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 import com.smartledger.data.db.AppDatabase
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -380,6 +381,7 @@ class PaymentNotificationListener : NotificationListenerService() {
 
         // 分类先算好再一次性 insert，避免 insert+update 触发首页两次全量刷新卡顿
         var categoryId: Long? = null
+        var categoryName: String? = null
         try {
             val categories = db.categoryDao().getAllOnce()
             categoryId = SmartCategorizer.categorize(
@@ -389,9 +391,17 @@ class PaymentNotificationListener : NotificationListenerService() {
                 categories = categories,
                 type = parsed.type
             )
+            categoryName = categories.find { it.id == categoryId }?.name
         } catch (e: Exception) {
             Log.e(TAG, "Auto categorize failed", e)
         }
+
+        val dining = DiningDetails.autoFor(
+            merchant = parsed.merchant,
+            note = null,
+            time = postTime,
+            isDining = DiningDetails.isDining(categoryName, parsed.type)
+        )
 
         val transaction = Transaction(
             amount = parsed.amount,
@@ -400,6 +410,9 @@ class PaymentNotificationListener : NotificationListenerService() {
             merchant = parsed.merchant,
             paymentMethod = parsed.paymentMethod,
             note = null,
+            mealType = dining?.mealType,
+            foodCategory = dining?.foodCategory,
+            foodName = dining?.foodName,
             source = "auto",
             notificationKey = parsed.notificationKey,
             transactionTime = postTime

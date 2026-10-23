@@ -2,6 +2,7 @@ package com.smartledger.service
 
 import android.content.Context
 import com.smartledger.data.db.entity.Category
+import com.smartledger.data.model.DiningDetails
 
 /**
  * 智能分类引擎
@@ -198,7 +199,17 @@ object SmartCategorizer {
             }
         }
 
-        // 3. 未匹配到任何分类 → 返回"其他"
+        // 3. 餐饮兜底：普通关键词没覆盖，但商户/备注命中了餐饮品类词库。
+        // 典型漏网：老王面馆、张亮麻辣烫、寿司店、炸鸡店、盖饭店。
+        // 只在支出时生效，命中后仍走同一个「餐饮」分类，不改变预算口径。
+        if (type == "expense" && DiningDetails.guessFoodCategory(merchant, note) != null) {
+            val dining = categories.find {
+                it.name == DiningDetails.DINING_CATEGORY_NAME && it.type == type
+            }
+            if (dining != null) return dining.id
+        }
+
+        // 4. 未匹配到任何分类 → 返回"其他"
         return categories.find { it.name == "其他" && it.type == type }?.id
     }
 

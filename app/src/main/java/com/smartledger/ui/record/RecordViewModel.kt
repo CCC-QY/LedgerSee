@@ -23,6 +23,9 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
         merchant: String?,
         paymentMethod: String?,
         note: String?,
+        mealType: String? = null,
+        foodCategory: String? = null,
+        foodName: String? = null,
         onSuccess: () -> Unit
     ) {
         viewModelScope.launch {
@@ -33,6 +36,9 @@ class RecordViewModel(application: Application) : AndroidViewModel(application) 
                 merchant = merchant,
                 paymentMethod = paymentMethod,
                 note = note,
+                mealType = mealType,
+                foodCategory = foodCategory,
+                foodName = foodName,
                 source = "manual",
                 transactionTime = System.currentTimeMillis()
             )

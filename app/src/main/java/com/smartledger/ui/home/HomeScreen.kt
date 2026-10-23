@@ -30,6 +30,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smartledger.data.db.entity.Category
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
+import com.smartledger.data.model.MealType
+import com.smartledger.ui.components.DiningFields
 import com.smartledger.ui.components.PaymentChannelPicker
 import com.smartledger.ui.components.SmartLedgerInputDialog
 import com.smartledger.ui.theme.SmartLedgerColors
@@ -616,7 +619,7 @@ private fun BalanceSection(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // 收入 + 结余 + 今日支出
+        // 收入 + 结余 + 本月支出
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -773,14 +776,22 @@ private fun TransactionItem(
                 fontWeight = FontWeight.Medium,
                 color = SmartLedgerColors.fg
             )
-            if (transaction.merchant != null || transaction.paymentMethod != null) {
+            if (transaction.merchant != null || transaction.paymentMethod != null ||
+                transaction.mealType != null || !transaction.foodName.isNullOrBlank()
+            ) {
                 Spacer(modifier = Modifier.height(2.dp))
+                val subtitle = buildList {
+                    DiningDetails.mealLabel(transaction.mealType)?.let { add(it) }
+                    val food = transaction.foodName?.takeIf { it.isNotBlank() }
+                    if (food != null) {
+                        add(food)
+                    } else {
+                        transaction.merchant?.let { add(it) }
+                    }
+                    transaction.paymentMethod?.let { add(it) }
+                }.joinToString(" · ")
                 Text(
-                    text = buildString {
-                        transaction.merchant?.let { append(it) }
-                        if (transaction.merchant != null && transaction.paymentMethod != null) append(" · ")
-                        transaction.paymentMethod?.let { append(it) }
-                    },
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = SmartLedgerColors.fgSecondary
                 )
@@ -894,9 +905,21 @@ private fun EditTransactionDialog(
     }
     var selectedType by remember { mutableStateOf(transaction.type) }
     var selectedCategoryId by remember { mutableStateOf(transaction.categoryId) }
+    var mealType by remember {
+        mutableStateOf(
+            transaction.mealType
+                ?: MealType.forTime(transaction.transactionTime).key
+        )
+    }
+    var foodCategory by remember { mutableStateOf(transaction.foodCategory) }
+    var foodName by remember { mutableStateOf(transaction.foodName ?: "") }
     val typeCategories = remember(categories, selectedType) {
         categories.filter { it.type == selectedType }
     }
+    val isDining = DiningDetails.isDining(
+        typeCategories.find { it.id == selectedCategoryId }?.name,
+        selectedType
+    )
 
     // 改了收支方向后，原来的分类属于另一个方向，必须换成新方向下的分类，
     // 否则会写出「收入 + 餐饮」这种不一致的数据。
@@ -958,7 +981,12 @@ private fun EditTransactionDialog(
                 // 商户
                 OutlinedTextField(
                     value = merchant,
-                    onValueChange = { merchant = it },
+                    onValueChange = { value ->
+                        merchant = value
+                        if (isDining && foodCategory == null) {
+                            foodCategory = DiningDetails.guessFoodCategory(value, note)?.key
+                        }
+                    },
                     label = { Text("商户名称") },
                     placeholder = { Text("如：蒙牛、美团") },
                     singleLine = true,
@@ -995,7 +1023,15 @@ private fun EditTransactionDialog(
                         val isSelected = category.id == selectedCategoryId
                         FilterChip(
                             selected = isSelected,
-                            onClick = { selectedCategoryId = category.id },
+                            onClick = {
+                                selectedCategoryId = category.id
+                                if (DiningDetails.isDining(category.name, selectedType) &&
+                                    foodCategory == null
+                                ) {
+                                    foodCategory =
+                                        DiningDetails.guessFoodCategory(merchant, note)?.key
+                                }
+                            },
                             label = { Text(category.name, fontSize = 12.sp) },
                             shape = RoundedCornerShape(8.dp),
                             colors = FilterChipDefaults.filterChipColors(
@@ -1004,6 +1040,16 @@ private fun EditTransactionDialog(
                             )
                         )
                     }
+                }
+                if (isDining) {
+                    DiningFields(
+                        mealType = mealType,
+                        onMealTypeChange = { mealType = it },
+                        foodName = foodName,
+                        onFoodNameChange = { foodName = it },
+                        foodCategory = foodCategory,
+                        onFoodCategoryChange = { foodCategory = it }
+                    )
                 }
             }
         },
@@ -1019,7 +1065,10 @@ private fun EditTransactionDialog(
                                 merchant = merchant.ifBlank { null },
                                 note = note.ifBlank { null },
                                 paymentMethod = paymentMethod.trim().ifBlank { "其他" },
-                                categoryId = selectedCategoryId
+                                categoryId = selectedCategoryId,
+                                mealType = if (isDining) mealType else null,
+                                foodCategory = if (isDining) foodCategory else null,
+                                foodName = if (isDining) foodName.trim().ifBlank { null } else null
                             )
                         )
                     }

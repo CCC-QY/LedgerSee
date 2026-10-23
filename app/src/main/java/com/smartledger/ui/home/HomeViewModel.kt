@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.smartledger.SmartLedgerApp
 import com.smartledger.data.db.entity.Category
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
 import com.smartledger.service.SmartCategorizer
 import com.smartledger.util.DateUtil
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -150,7 +151,22 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun updateTransactionCategory(transaction: Transaction, categoryId: Long?) {
         viewModelScope.launch {
-            repo.update(transaction.copy(categoryId = categoryId))
+            val category = categoryId?.let { categoryRepo.getById(it) }
+            val dining = DiningDetails.isDining(category?.name, transaction.type)
+            val auto = DiningDetails.autoFor(
+                merchant = transaction.merchant,
+                note = transaction.note,
+                time = transaction.transactionTime,
+                isDining = dining
+            )
+            repo.update(
+                transaction.copy(
+                    categoryId = categoryId,
+                    mealType = if (dining) transaction.mealType ?: auto?.mealType else null,
+                    foodCategory = if (dining) transaction.foodCategory ?: auto?.foodCategory else null,
+                    foodName = if (dining) transaction.foodName else null
+                )
+            )
             if (categoryId != null && !transaction.merchant.isNullOrBlank()) {
                 SmartCategorizer.saveMerchantCategory(
                     getApplication(),

@@ -51,7 +51,18 @@ interface TransactionDao {
     @Query("SELECT categoryId, SUM(amount) as total FROM transactions WHERE type = 'expense' AND transactionTime BETWEEN :startTime AND :endTime GROUP BY categoryId ORDER BY total DESC")
     fun getExpenseGroupByCategory(startTime: Long, endTime: Long): Flow<List<CategoryTotal>>
 
-    @Query("SELECT * FROM transactions WHERE merchant LIKE '%' || :keyword || '%' OR note LIKE '%' || :keyword || '%' ORDER BY transactionTime DESC")
+    // ═══ 餐饮明细：餐次 / 品类 / 菜名 ═══
+
+    @Query("SELECT mealType, SUM(amount) as total, COUNT(*) as itemCount FROM transactions WHERE type = 'expense' AND categoryId = :categoryId AND transactionTime BETWEEN :startTime AND :endTime GROUP BY mealType ORDER BY total DESC")
+    fun getDiningByMeal(categoryId: Long, startTime: Long, endTime: Long): Flow<List<MealTotal>>
+
+    @Query("SELECT foodCategory, SUM(amount) as total, COUNT(*) as itemCount FROM transactions WHERE type = 'expense' AND categoryId = :categoryId AND foodCategory IS NOT NULL AND foodCategory != '' AND transactionTime BETWEEN :startTime AND :endTime GROUP BY foodCategory ORDER BY total DESC")
+    fun getDiningByFoodCategory(categoryId: Long, startTime: Long, endTime: Long): Flow<List<FoodCategoryTotal>>
+
+    @Query("SELECT foodName, SUM(amount) as total, COUNT(*) as itemCount FROM transactions WHERE type = 'expense' AND categoryId = :categoryId AND foodName IS NOT NULL AND foodName != '' AND transactionTime BETWEEN :startTime AND :endTime GROUP BY foodName ORDER BY itemCount DESC, total DESC LIMIT 5")
+    fun getTopDiningFoods(categoryId: Long, startTime: Long, endTime: Long): Flow<List<FoodNameTotal>>
+
+    @Query("SELECT * FROM transactions WHERE merchant LIKE '%' || :keyword || '%' OR note LIKE '%' || :keyword || '%' OR foodName LIKE '%' || :keyword || '%' ORDER BY transactionTime DESC")
     fun search(keyword: String): Flow<List<Transaction>>
 
     @Query("SELECT COUNT(*) FROM transactions")
@@ -64,4 +75,22 @@ interface TransactionDao {
 data class CategoryTotal(
     val categoryId: Long?,
     val total: Double
+)
+
+data class MealTotal(
+    val mealType: String?,
+    val total: Double,
+    val itemCount: Int
+)
+
+data class FoodCategoryTotal(
+    val foodCategory: String?,
+    val total: Double,
+    val itemCount: Int
+)
+
+data class FoodNameTotal(
+    val foodName: String?,
+    val total: Double,
+    val itemCount: Int
 )

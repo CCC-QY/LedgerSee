@@ -7,6 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.smartledger.SmartLedgerApp
 import com.smartledger.data.db.entity.Category
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
+import com.smartledger.data.model.MealType
 import com.smartledger.screenshot.ScreenshotBillParser
 import com.smartledger.screenshot.ScreenshotOcr
 import com.smartledger.service.SmartCategorizer
@@ -33,6 +35,9 @@ data class ScreenshotUiState(
     val paymentMethod: String = "微信",
     val categoryId: Long? = null,
     val note: String = "",
+    val mealType: String? = null,
+    val foodCategory: String? = null,
+    val foodName: String = "",
     val categories: List<Category> = emptyList(),
     val transactionTime: Long = System.currentTimeMillis(),
     val timeLabel: String = "",
@@ -72,6 +77,9 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
                 type = "expense",
                 paymentMethod = "微信",
                 categoryId = null,
+                mealType = null,
+                foodCategory = null,
+                foodName = "",
                 transactionTime = System.currentTimeMillis(),
                 timeLabel = ""
             )
@@ -105,6 +113,13 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
                     )
                 }
                 val transactionTime = parsed.transactionTime ?: System.currentTimeMillis()
+                val categoryName = categories.find { it.id == categoryId }?.name
+                val dining = DiningDetails.autoFor(
+                    merchant = parsed.merchant,
+                    note = parsed.foodName,
+                    time = transactionTime,
+                    isDining = DiningDetails.isDining(categoryName, parsed.type)
+                )
                 _state.update {
                     it.copy(
                         isRecognizing = false,
@@ -116,6 +131,9 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
                         type = parsed.type,
                         paymentMethod = parsed.paymentMethod ?: it.paymentMethod,
                         categoryId = categoryId,
+                        mealType = dining?.mealType,
+                        foodCategory = dining?.foodCategory,
+                        foodName = parsed.foodName.orEmpty(),
                         categories = categories,
                         transactionTime = transactionTime,
                         timeLabel = formatTime(transactionTime),
@@ -151,6 +169,18 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
         _state.update { it.copy(note = value.take(80)) }
     }
 
+    fun setMealType(value: String) {
+        _state.update { it.copy(mealType = value) }
+    }
+
+    fun setFoodCategory(value: String?) {
+        _state.update { it.copy(foodCategory = value) }
+    }
+
+    fun setFoodName(value: String) {
+        _state.update { it.copy(foodName = value.take(40)) }
+    }
+
     fun setType(value: String) {
         _state.update { current ->
             if (current.type == value) return@update current
@@ -160,12 +190,38 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
             } else {
                 current.categories.find { it.type == value && it.name == "其他" }?.id
             }
-            current.copy(type = value, categoryId = categoryId)
+            val nextCategory = current.categories.find { it.id == categoryId }
+            val dining = DiningDetails.isDining(nextCategory?.name, value)
+            current.copy(
+                type = value,
+                categoryId = categoryId,
+                mealType = if (dining) {
+                    current.mealType ?: MealType.forTime(current.transactionTime).key
+                } else null,
+                foodCategory = if (dining) {
+                    current.foodCategory
+                        ?: DiningDetails.guessFoodCategory(current.merchant, current.foodName)?.key
+                } else null,
+                foodName = if (dining) current.foodName else ""
+            )
         }
     }
 
     fun setCategory(category: Category) {
-        _state.update { it.copy(categoryId = category.id) }
+        _state.update { current ->
+            val dining = DiningDetails.isDining(category.name, current.type)
+            current.copy(
+                categoryId = category.id,
+                mealType = if (dining) {
+                    current.mealType ?: MealType.forTime(current.transactionTime).key
+                } else null,
+                foodCategory = if (dining) {
+                    current.foodCategory
+                        ?: DiningDetails.guessFoodCategory(current.merchant, current.foodName)?.key
+                } else null,
+                foodName = if (dining) current.foodName else ""
+            )
+        }
     }
 
     fun setPaymentMethod(value: String) {
@@ -174,7 +230,15 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
 
     fun useCurrentTime() {
         val now = System.currentTimeMillis()
-        _state.update { it.copy(transactionTime = now, timeLabel = formatTime(now)) }
+        _state.update { current ->
+            val categoryName = current.categories.find { it.id == current.categoryId }?.name
+            val dining = DiningDetails.isDining(categoryName, current.type)
+            current.copy(
+                transactionTime = now,
+                timeLabel = formatTime(now),
+                mealType = if (dining) MealType.forTime(now).key else current.mealType
+            )
+        }
     }
 
     fun save() {
@@ -191,6 +255,8 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
         _state.update { it.copy(isSaving = true, error = null) }
         viewModelScope.launch {
             try {
+                val categoryName = current.categories.find { it.id == current.categoryId }?.name
+                val dining = DiningDetails.isDining(categoryName, current.type)
                 withContext(Dispatchers.IO) {
                     app.transactionRepository.insert(
                         Transaction(
@@ -200,6 +266,9 @@ class ScreenshotImportViewModel(application: Application) : AndroidViewModel(app
                             merchant = current.merchant.trim().ifBlank { null },
                             paymentMethod = current.paymentMethod.trim().ifBlank { null },
                             note = current.note.trim().ifBlank { null },
+                            mealType = if (dining) current.mealType else null,
+                            foodCategory = if (dining) current.foodCategory else null,
+                            foodName = if (dining) current.foodName.trim().ifBlank { null } else null,
                             source = "screenshot",
                             transactionTime = current.transactionTime
                         )

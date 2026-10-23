@@ -7,6 +7,7 @@ import android.provider.Telephony
 import android.util.Log
 import com.smartledger.data.db.AppDatabase
 import com.smartledger.data.db.entity.Transaction
+import com.smartledger.data.model.DiningDetails
 import com.smartledger.util.CurrencyUtil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -148,6 +149,7 @@ class SmsReceiver : BroadcastReceiver() {
             }
 
             var categoryId: Long? = null
+            var categoryName: String? = null
             try {
                 val categories = db.categoryDao().getAllOnce()
                 categoryId = SmartCategorizer.categorize(
@@ -157,9 +159,17 @@ class SmsReceiver : BroadcastReceiver() {
                     categories = categories,
                     type = type
                 )
+                categoryName = categories.find { it.id == categoryId }?.name
             } catch (e: Exception) {
                 Log.e(TAG, "SMS categorize failed", e)
             }
+
+            val dining = DiningDetails.autoFor(
+                merchant = merchant,
+                note = null,
+                time = now,
+                isDining = DiningDetails.isDining(categoryName, type)
+            )
 
             val id = db.transactionDao().insert(
                 Transaction(
@@ -169,6 +179,9 @@ class SmsReceiver : BroadcastReceiver() {
                     merchant = merchant,
                     paymentMethod = bankName,
                     note = null,
+                    mealType = dining?.mealType,
+                    foodCategory = dining?.foodCategory,
+                    foodName = dining?.foodName,
                     source = "sms",
                     notificationKey = null,
                     transactionTime = now

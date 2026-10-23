@@ -2,6 +2,9 @@ package com.smartledger.data.repository
 
 import com.smartledger.data.db.dao.TransactionDao
 import com.smartledger.data.db.dao.CategoryTotal
+import com.smartledger.data.db.dao.FoodCategoryTotal
+import com.smartledger.data.db.dao.FoodNameTotal
+import com.smartledger.data.db.dao.MealTotal
 import com.smartledger.data.db.entity.Transaction
 import kotlinx.coroutines.flow.Flow
 
@@ -41,6 +44,23 @@ class TransactionRepository(private val dao: TransactionDao) {
 
     fun getExpenseGroupByCategory(startTime: Long, endTime: Long): Flow<List<CategoryTotal>> =
         dao.getExpenseGroupByCategory(startTime, endTime)
+
+    fun getDiningByMeal(categoryId: Long, startTime: Long, endTime: Long): Flow<List<MealTotal>> =
+        dao.getDiningByMeal(categoryId, startTime, endTime)
+
+    fun getDiningByFoodCategory(
+        categoryId: Long,
+        startTime: Long,
+        endTime: Long
+    ): Flow<List<FoodCategoryTotal>> =
+        dao.getDiningByFoodCategory(categoryId, startTime, endTime)
+
+    fun getTopDiningFoods(
+        categoryId: Long,
+        startTime: Long,
+        endTime: Long
+    ): Flow<List<FoodNameTotal>> =
+        dao.getTopDiningFoods(categoryId, startTime, endTime)
 
     fun search(keyword: String): Flow<List<Transaction>> = dao.search(keyword)
 }

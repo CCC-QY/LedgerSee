@@ -10,6 +10,7 @@ data class ScreenshotBill(
     val merchant: String?,
     val paymentMethod: String?,
     val transactionTime: Long?,
+    val foodName: String? = null,
     val rawText: String
 )
 
@@ -37,7 +38,11 @@ object ScreenshotBillParser {
 
     private val merchantLabels = listOf(
         "商户名称", "商户全称", "商户", "收款方", "付款给", "转账给",
-        "对方", "商家", "商品名称", "商品", "订单名称"
+        "对方", "商家"
+    )
+
+    private val itemLabels = listOf(
+        "商品名称", "商品说明", "商品", "订单名称", "订单内容"
     )
 
     private val bankNames = listOf(
@@ -64,6 +69,7 @@ object ScreenshotBillParser {
         val amount = extractAmount(normalized)
         val type = detectType(normalized)
         val merchant = extractMerchant(normalized)
+        val foodName = extractFoodName(normalized)
         val method = detectPaymentMethod(normalized)
         val time = parseTime(normalized, now, zone)
         return ScreenshotBill(
@@ -72,6 +78,7 @@ object ScreenshotBillParser {
             merchant = merchant,
             paymentMethod = method,
             transactionTime = time,
+            foodName = foodName,
             rawText = normalized
         )
     }
@@ -211,6 +218,40 @@ object ScreenshotBillParser {
         }
         if (merchantNoise.any { value == it || value.contains(it) }) return null
         if (bankNames.any { value == it }) return null
+        if (Regex("^[\\d\\s:./年-]+$").matches(value)) return null
+        if (value.count { it in '\u4e00'..'\u9fff' } == 0 &&
+            !Regex("[A-Za-z]{2,}").containsMatchIn(value)
+        ) return null
+        return value
+    }
+
+    /** 截图里的商品/订单名称，作为「吃了什么」的初始值；没有就返回 null。 */
+    private fun extractFoodName(text: String): String? {
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        for ((index, line) in lines.withIndex()) {
+            for (label in itemLabels) {
+                val at = line.indexOf(label)
+                if (at < 0) continue
+                var value = line.substring(at + label.length)
+                    .trimStart('：', ':', ' ', '\t')
+                if (value.isBlank() && index + 1 < lines.size) {
+                    value = lines[index + 1]
+                }
+                cleanFoodName(value)?.let { return it }
+            }
+        }
+        return null
+    }
+
+    private fun cleanFoodName(raw: String): String? {
+        val value = raw
+            .replace(Regex("\\s{3,}.*$"), "")
+            .trim()
+            .trim('：', ':', '-', '—', '|', '·')
+            .trimEnd('>', '›', '…', '.', '。')
+            .trim()
+        if (value.length !in 1..40) return null
+        if (merchantNoise.any { value == it || value.contains(it) }) return null
         if (Regex("^[\\d\\s:./年-]+$").matches(value)) return null
         if (value.count { it in '\u4e00'..'\u9fff' } == 0 &&
             !Regex("[A-Za-z]{2,}").containsMatchIn(value)

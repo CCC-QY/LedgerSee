@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
         AiReport::class,
         QuipMessage::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -83,6 +83,33 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v3 → v4：账单增加餐饮明细（餐次/品类/菜名）。
+         *
+         * 只回填“餐次”这个时间事实，不猜菜名/品类，避免给历史数据造出假精度。
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `mealType` TEXT")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `foodCategory` TEXT")
+                db.execSQL("ALTER TABLE `transactions` ADD COLUMN `foodName` TEXT")
+
+                val localMinutes =
+                    "(CAST(strftime('%H', `transactionTime` / 1000, 'unixepoch', 'localtime') AS INTEGER) * 60 + " +
+                        "CAST(strftime('%M', `transactionTime` / 1000, 'unixepoch', 'localtime') AS INTEGER))"
+                db.execSQL(
+                    "UPDATE `transactions` SET `mealType` = CASE " +
+                        "WHEN $localMinutes BETWEEN 300 AND 629 THEN 'breakfast' " +
+                        "WHEN $localMinutes BETWEEN 630 AND 869 THEN 'lunch' " +
+                        "WHEN $localMinutes BETWEEN 870 AND 1019 THEN 'teatime' " +
+                        "WHEN $localMinutes BETWEEN 1020 AND 1259 THEN 'dinner' " +
+                        "ELSE 'late_night' END " +
+                        "WHERE `type` = 'expense' AND `categoryId` IN " +
+                        "(SELECT `id` FROM `categories` WHERE `name` = '餐饮' AND `type` = 'expense')"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -90,7 +117,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "smart_ledger.db"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance

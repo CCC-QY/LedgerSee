@@ -27,7 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.smartledger.data.db.dao.CategoryTotal
+import com.smartledger.data.db.dao.FoodCategoryTotal
+import com.smartledger.data.db.dao.FoodNameTotal
+import com.smartledger.data.db.dao.MealTotal
 import com.smartledger.data.db.entity.Category
+import com.smartledger.data.model.DiningDetails
 import com.smartledger.ui.theme.SmartLedgerColors
 import com.smartledger.util.CurrencyUtil
 import com.smartledger.util.DateUtil
@@ -42,6 +46,10 @@ fun StatisticsScreen(
     val periodIncome by viewModel.periodIncome.collectAsState(initial = 0.0)
     val expenseByCategory by viewModel.expenseByCategory.collectAsState(initial = emptyList())
     val categories by viewModel.categories.collectAsState(initial = emptyList())
+    val diningByMeal by viewModel.diningByMeal.collectAsState(initial = emptyList())
+    val diningTotal by viewModel.diningTotal.collectAsState(initial = 0.0)
+    val diningByFoodCategory by viewModel.diningByFoodCategory.collectAsState(initial = emptyList())
+    val topDiningFoods by viewModel.topDiningFoods.collectAsState(initial = emptyList())
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -175,6 +183,163 @@ fun StatisticsScreen(
             }
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
+
+            // ═══ 餐饮明细：餐次 / 品类 / 菜名 ═══
+            if (diningByMeal.isNotEmpty() || diningTotal > 0.0) {
+                item {
+                    DiningBreakdownCard(
+                        diningTotal = diningTotal,
+                        meals = diningByMeal,
+                        foodCategories = diningByFoodCategory,
+                        topFoods = topDiningFoods
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(16.dp)) }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════
+// 餐饮明细卡
+// ═══════════════════════════════════════════════════════
+
+@Composable
+private fun DiningBreakdownCard(
+    diningTotal: Double,
+    meals: List<MealTotal>,
+    foodCategories: List<FoodCategoryTotal>,
+    topFoods: List<FoodNameTotal>
+) {
+    val orderedMeals = meals.sortedBy {
+        com.smartledger.data.model.MealType.fromKey(it.mealType)?.ordinal ?: 99
+    }
+    val maxMeal = orderedMeals.maxOfOrNull { it.total } ?: 1.0
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = SmartLedgerColors.surface)
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "餐饮明细",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = SmartLedgerColors.fg
+                    )
+                    Text(
+                        text = "按餐次、品类和菜名拆开看",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SmartLedgerColors.fgSecondary
+                    )
+                }
+                Text(
+                    text = "¥${CurrencyUtil.format(diningTotal)}",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontFamily = FontFamily.Monospace
+                    ),
+                    fontWeight = FontWeight.Bold,
+                    color = SmartLedgerColors.fg
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            orderedMeals.forEach { meal ->
+                val label = DiningDetails.mealLabel(meal.mealType) ?: "未标注"
+                val fraction = if (maxMeal > 0) {
+                    (meal.total / maxMeal).toFloat().coerceIn(0f, 1f)
+                } else 0f
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = SmartLedgerColors.fgSecondary,
+                        modifier = Modifier.width(48.dp)
+                    )
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(6.dp)
+                            .background(SmartLedgerColors.surfaceHover, RoundedCornerShape(3.dp))
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction = fraction)
+                                .height(6.dp)
+                                .background(SmartLedgerColors.accent, RoundedCornerShape(3.dp))
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "¥${CurrencyUtil.format(meal.total)}",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            fontFamily = FontFamily.Monospace
+                        ),
+                        color = SmartLedgerColors.fg
+                    )
+                }
+            }
+
+            if (foodCategories.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                HorizontalDivider(color = SmartLedgerColors.border, thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "品类",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = SmartLedgerColors.fgSecondary
+                )
+                foodCategories.take(4).forEach { item ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = DiningDetails.foodCategoryLabel(item.foodCategory) ?: "其他",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = SmartLedgerColors.fg,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            text = "¥${CurrencyUtil.format(item.total)} · ${item.itemCount} 笔",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SmartLedgerColors.fgSecondary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+            if (topFoods.isNotEmpty()) {
+                Text(
+                    text = "常吃：" + topFoods.joinToString(" · ") {
+                        "${it.foodName} ×${it.itemCount}"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SmartLedgerColors.fgSecondary
+                )
+            } else {
+                Text(
+                    text = "还没有菜名记录，点账单编辑可以补上吃了什么。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = SmartLedgerColors.fgSecondary
+                )
+            }
         }
     }
 }

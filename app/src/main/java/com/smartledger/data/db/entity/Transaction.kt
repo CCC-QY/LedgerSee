@@ -26,6 +26,12 @@ data class Transaction(
     val merchant: String? = null,
     val paymentMethod: String? = null,
     val note: String? = null,
+    /** 餐饮明细：餐次（早餐/午餐/下午茶/晚餐/夜宵），仅支出且分类为餐饮时有值 */
+    val mealType: String? = null,
+    /** 餐饮明细：粗粒度品类（面食/火锅/咖啡…），用于统计 */
+    val foodCategory: String? = null,
+    /** 餐饮明细：具体吃了什么（牛肉面…），只接受用户输入/OCR */
+    val foodName: String? = null,
     val source: String,
     val notificationKey: String? = null,
     val transactionTime: Long,

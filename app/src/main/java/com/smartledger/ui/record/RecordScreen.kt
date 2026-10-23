@@ -26,6 +26,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
 import com.smartledger.data.db.entity.Category
+import com.smartledger.data.model.DiningDetails
+import com.smartledger.data.model.MealType
+import com.smartledger.ui.components.DiningFields
 import com.smartledger.ui.components.PaymentChannelPicker
 import com.smartledger.ui.theme.SmartLedgerColors
 
@@ -41,6 +44,11 @@ fun RecordScreen(
     var merchant by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var paymentMethod by remember { mutableStateOf("微信") }
+    var mealType by remember {
+        mutableStateOf(MealType.forTime(System.currentTimeMillis()).key)
+    }
+    var foodCategory by remember { mutableStateOf<String?>(null) }
+    var foodName by remember { mutableStateOf("") }
 
     val categories by viewModel.getCategories(transactionType)
         .collectAsState(initial = emptyList())
@@ -52,6 +60,22 @@ fun RecordScreen(
 
     LaunchedEffect(transactionType) {
         selectedCategory = null
+        foodCategory = null
+        foodName = ""
+        mealType = MealType.forTime(System.currentTimeMillis()).key
+    }
+
+    val isDining = DiningDetails.isDining(selectedCategory?.name, transactionType)
+
+    fun selectCategory(category: Category) {
+        selectedCategory = category
+        if (DiningDetails.isDining(category.name, transactionType)) {
+            mealType = MealType.forTime(System.currentTimeMillis()).key
+            foodCategory = DiningDetails.guessFoodCategory(merchant, note)?.key
+        } else {
+            foodCategory = null
+            foodName = ""
+        }
     }
 
     Box(modifier = Modifier.fillMaxSize().background(SmartLedgerColors.bg)) {
@@ -141,7 +165,12 @@ fun RecordScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 OutlinedTextField(
                     value = merchant,
-                    onValueChange = { merchant = it },
+                    onValueChange = { value ->
+                        merchant = value
+                        if (isDining && foodCategory == null) {
+                            foodCategory = DiningDetails.guessFoodCategory(value, note)?.key
+                        }
+                    },
                     placeholder = {
                         Text(
                             "商户名称（如蒙牛、美团）…",
@@ -244,9 +273,21 @@ fun RecordScreen(
                     CategoryItem(
                         category = category,
                         selected = selectedCategory?.id == category.id,
-                        onClick = { selectedCategory = category }
+                        onClick = { selectCategory(category) }
                     )
                 }
+            }
+
+            if (isDining) {
+                DiningFields(
+                    mealType = mealType,
+                    onMealTypeChange = { mealType = it },
+                    foodName = foodName,
+                    onFoodNameChange = { foodName = it },
+                    foodCategory = foodCategory,
+                    onFoodCategoryChange = { foodCategory = it },
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -316,11 +357,17 @@ fun RecordScreen(
                                 merchant = merchant.ifBlank { null },
                                 paymentMethod = channel,
                                 note = note.ifBlank { null },
+                                mealType = if (isDining) mealType else null,
+                                foodCategory = if (isDining) foodCategory else null,
+                                foodName = if (isDining) foodName.trim().ifBlank { null } else null,
                                 onSuccess = {
                                     amountText = "0"
                                     selectedCategory = null
                                     merchant = ""
                                     note = ""
+                                    foodCategory = null
+                                    foodName = ""
+                                    mealType = MealType.forTime(System.currentTimeMillis()).key
                                     // 保留上次渠道，连续记账更省事
                                     appScope?.launch {
                                         runCatching {
