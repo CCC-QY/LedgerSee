@@ -577,6 +577,11 @@ private fun BalanceSection(
 ) {
     val balance = monthIncome - monthExpense
 
+    // 当前月把「今日支出」放大：打开 App 多数是想知道今天花了多少。
+    // 看历史月份时「今日」没有意义，大字退回成那个月的支出。
+    val heroLabel = if (isCurrentMonth) "今日支出" else "${yearMonthLabel} 支出"
+    val heroAmount = if (isCurrentMonth) todayExpense else monthExpense
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -584,7 +589,7 @@ private fun BalanceSection(
     ) {
         // 支出标签
         Text(
-            text = if (isCurrentMonth) "本月支出" else "${yearMonthLabel} 支出",
+            text = heroLabel,
             style = MaterialTheme.typography.bodySmall,
             color = SmartLedgerColors.fgSecondary
         )
@@ -598,7 +603,7 @@ private fun BalanceSection(
                 modifier = Modifier.padding(bottom = 4.dp)
             )
             Text(
-                text = CurrencyUtil.format(monthExpense),
+                text = CurrencyUtil.format(heroAmount),
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontFamily = FontFamily.Monospace,
                     fontWeight = FontWeight.Bold,
@@ -668,16 +673,16 @@ private fun BalanceSection(
                 )
             }
 
-            // 今日支出（仅查看本月时有意义）
+            // 本月支出（与大字对调；看历史月份时这里退回笔数占位）
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = if (isCurrentMonth) "今日支出" else "当月笔数",
+                    text = if (isCurrentMonth) "本月支出" else "当月笔数",
                     style = MaterialTheme.typography.labelMedium,
                     color = SmartLedgerColors.fgSecondary
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (isCurrentMonth) "¥${CurrencyUtil.format(todayExpense)}"
+                    text = if (isCurrentMonth) "¥${CurrencyUtil.format(monthExpense)}"
                     else "—",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontFamily = FontFamily.Monospace
