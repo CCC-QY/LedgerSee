@@ -5,7 +5,7 @@
 [![Platform](https://img.shields.io/badge/platform-Android%208.0%2B-green.svg)](https://github.com/CCC-QY/LedgerSee)
 
 一款 Android 本地智能记账应用：监听支付类通知自动入账，也支持手动记账、截图记账、预算、统计与数据备份。  
-当前版本：**v1.3.7**
+当前版本：**v1.3.8**
 
 > 本项目基于 [SmartLedger](https://github.com/huanghhcri/SmartLedger) 二次开发，遵循 MIT 协议。上游署名见 [NOTICE](NOTICE)。
 
@@ -209,6 +209,7 @@ LedgerSee 在 SmartLedger 的基础上继续演进，主要新增：
 
 详见 [Releases](https://github.com/CCC-QY/LedgerSee/releases)。
 
+- **v1.3.8**：修复微信/支付宝余额不足走银行卡时重复记账——跨渠道同笔合并窗口放宽到 5 分钟
 - **v1.3.7**：餐饮明细（餐次 / 品类 / 菜名），自动记账按时间与商户补全；自动分类增加餐饮兜底
 - **v1.3.6**：首页大字改为「今日支出」，本月支出降到右下角小字
 - **v1.3.5**：修复 1.3.4 引入的「键盘不弹出」——撤掉 windowSoftInputMode=adjustResize
